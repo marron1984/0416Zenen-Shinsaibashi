@@ -2,11 +2,12 @@
 """
 generate_reel.py
 
-第3週：比較検討② — Instagram Reels 向けプレースホルダ動画生成スクリプト.
+第3週：比較検討② — Instagram Reels 向け動画生成スクリプト.
 
 - 出力: 1080x1920 / 30fps / H.264 yuv420p / 無音 AAC / faststart
+- 背景は単色 or 実写画像 (Ken Burns 風ゆるやかなズーム)
 - テキストは libass (ffmpeg の subtitles フィルタ) 経由で日本語描画
-- 完成動画の素材写真を差し替えるときは SCENES の background を画像パスに変更する
+- 実写背景の上には下半分に黒のグラデ状オーバーレイを重ねて可読性を確保
 
 使い方:
     python3 scripts/generate_reel.py
@@ -21,7 +22,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 # ---------- 設定 ----------
@@ -37,30 +38,54 @@ CREAM = "#e9dfcb"
 WHITE = "#f5f5f5"
 SUB_GRAY = "#b8b0a2"
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
 
 @dataclass
 class Scene:
     duration: float
-    bg_hex: str
     title: str
     sub: str
+    bg_hex: str = COAL
+    image: str | None = None  # ファイル名 (REPO_ROOT 相対)
     badge: str = ""
     caption: str = ""
     title_color: str = WHITE
     sub_color: str = SUB_GRAY
     badge_color: str = GOLD
     caption_color: str = GOLD
+    zoom_dir: str = "in"  # "in" or "out"
 
 
 SCENES: list[Scene] = [
-    Scene(3.0, COAL, "大切な接待で", "失敗したくない方へ", title_color=CREAM),
-    Scene(3.0, NAVY, "席が近い。声が響く。", "落ち着いて話せない。"),
-    Scene(3.0, COAL, "完全個室", "誰にも聞かれない空間", badge="01"),
-    Scene(3.0, NAVY, "ゆとりある席間", "自然と距離が守られる", badge="02"),
-    Scene(3.0, COAL, "静かな導線設計", "来店から退店まで気を遣わせない", badge="03"),
-    Scene(3.0, NAVY, "会食・顔合わせに最適", "格式と寛ぎを両立", badge="04"),
-    Scene(6.0, COAL, "大切な一席は", "心斎橋の会食処で",
-          caption="Instagramで詳細を見る", title_color=CREAM),
+    Scene(3.0, "大切な接待で", "失敗したくない方へ",
+          bg_hex=COAL, title_color=CREAM),
+
+    Scene(3.0, "席が近い。声が響く。", "落ち着かない空間は、話も進まない。",
+          bg_hex=NAVY),
+
+    Scene(4.0, "陽明 Youmei", "畳に市松、品格の個室",
+          image="陽明 Youmei.JPG",
+          badge="01", caption="2〜6名 / 完全個室",
+          zoom_dir="in"),
+
+    Scene(4.0, "日月 Nichigetsu", "品のある和モダン",
+          image=" 日月 Nichigetsu02.JPG",
+          badge="02", caption="2〜6名 / 完全個室",
+          zoom_dir="out"),
+
+    Scene(4.0, "梨山 rizan", "茶器が彩る禅の空間",
+          image="梨山 rizan01.JPG",
+          badge="03", caption="7〜10名 / 完全個室",
+          zoom_dir="in"),
+
+    Scene(3.0, "すべて完全個室", "守られる席間、静かな会話",
+          bg_hex=COAL, title_color=CREAM),
+
+    Scene(6.0, "大切な一席は", "心斎橋 禅園で",
+          image="陽明 Youmei.JPG",
+          caption="Instagramで詳細を見る",
+          title_color=CREAM, zoom_dir="out"),
 ]
 
 BRAND = "Zenen Shinsaibashi"
@@ -80,7 +105,6 @@ def find_ffmpeg() -> str:
 
 
 def find_font() -> tuple[str, str]:
-    """Return (font_file_path, ass_font_name)."""
     candidates = [
         ("/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf", "IPAGothic"),
         ("/usr/share/fonts/truetype/fonts-japanese-gothic.ttf", "IPAGothic"),
@@ -100,12 +124,10 @@ def hex_to_ass_color(hex_rgb: str) -> str:
 
 
 def hex_to_ffmpeg_color(hex_rgb: str) -> str:
-    """#RRGGBB -> 0xRRGGBB for ffmpeg color source."""
     return "0x" + hex_rgb.lstrip("#").upper()
 
 
 def ass_ts(seconds: float) -> str:
-    """seconds -> H:MM:SS.CS (centiseconds)."""
     cs_total = int(round(seconds * 100))
     h, rem = divmod(cs_total, 360000)
     m, rem = divmod(rem, 6000)
@@ -113,67 +135,108 @@ def ass_ts(seconds: float) -> str:
     return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
 
+# ---------- ASS 生成 ----------
+
+
 def build_scene_ass(scene: Scene, font_name: str) -> str:
-    """Build a standalone ASS subtitle file for a single scene."""
     dur = scene.duration
     start = ass_ts(0.0)
     end = ass_ts(dur)
-    # フェードイン/アウト (ミリ秒): \fad(in_ms, out_ms)
     fade = r"{\fad(400,400)}"
 
-    brand = BRAND
+    # Instagram Reels のセーフエリアを意識:
+    # - top ~220px はアカウント情報
+    # - bottom ~400px はいいね/キャプション UI
+    # テキストは 260 〜 1520 の範囲に収める
+    # Brand band: y=200
+    # Badge: y=520
+    # Title: y=900 (no badge) / y=880 (with badge)
+    # Sub: Title + 150
+    # Caption: y=1440
 
-    # Styles use ASS color format.
     styles = [
-        ("Brand", font_name, 44, hex_to_ass_color(CREAM), 0, 2, 80),
-        ("Title", font_name, 96, hex_to_ass_color(scene.title_color), -1, 5, 0),
-        ("Sub", font_name, 60, hex_to_ass_color(scene.sub_color), 0, 5, 0),
-        ("Badge", font_name, 220, hex_to_ass_color(scene.badge_color), -1, 5, 0),
-        ("Caption", font_name, 52, hex_to_ass_color(scene.caption_color), -1, 2, 240),
+        # name, size, color, bold, alignment, marginv
+        ("Brand", 44, hex_to_ass_color(CREAM), 0, 2, 140),
+        ("Title", 96, hex_to_ass_color(scene.title_color), -1, 5, 0),
+        ("Sub", 56, hex_to_ass_color(scene.sub_color), 0, 5, 0),
+        ("Badge", 200, hex_to_ass_color(scene.badge_color), -1, 5, 0),
+        ("Caption", 48, hex_to_ass_color(scene.caption_color), -1, 2, 460),
+        ("Overlay", 10, "&H00000000", 0, 7, 0),  # for shape drawing
     ]
 
     style_lines = []
-    # Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour,
-    #         Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle,
-    #         BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-    for name, fn, size, color, bold, align, marginv in styles:
+    for name, size, color, bold, align, marginv in styles:
+        # Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour,
+        #         Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle,
+        #         BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
         style_lines.append(
-            f"Style: {name},{fn},{size},{color},&H000000FF,&H00000000,&H64000000,"
+            f"Style: {name},{font_name},{size},{color},&H000000FF,&H00000000,&H64000000,"
             f"{bold},0,0,0,100,100,0,0,1,0,0,{align},40,40,{marginv},1"
         )
 
     events: list[str] = []
 
-    def add(style: str, text: str, pos: tuple[int, int] | None = None):
+    def add(style: str, text: str, pos: tuple[int, int] | None = None,
+            extra_tags: str = ""):
         pos_tag = f"{{\\pos({pos[0]},{pos[1]})}}" if pos else ""
         events.append(
-            f"Dialogue: 0,{start},{end},{style},,0,0,0,,{fade}{pos_tag}{text}"
+            f"Dialogue: 0,{start},{end},{style},,0,0,0,,{fade}{extra_tags}{pos_tag}{text}"
         )
 
-    # Brand band (top)
-    add("Brand", brand)
+    is_photo = scene.image is not None
 
-    # Badge (if any)
+    # ----- 実写背景のときだけ、テキスト可読性のための暗幕レイヤーを敷く -----
+    # 画像全体の 20% ダーケンは ffmpeg の eq フィルタ側でやっているので、
+    # ここでは文字が来る領域を追加で暗く落とす。
+    if is_photo:
+        # 上の帯 (ブランド + バッジ領域) y=0〜820
+        top_band = (
+            f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
+            r"{\an7\pos(0,0)\p4\bord0\shad0\1c&H000000&\1a&H58&}"
+            f"m 0 0 l {WIDTH*16} 0 l {WIDTH*16} {820*16} l 0 {820*16}"
+            r"{\p0}"
+        )
+        events.append(top_band)
+        # 下の帯 (タイトル〜キャプション) y=820〜1920
+        bottom_band = (
+            f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
+            r"{\an7\pos(0,820)\p4\bord0\shad0\1c&H000000&\1a&H38&}"
+            f"m 0 0 l {WIDTH*16} 0 l {WIDTH*16} {1100*16} l 0 {1100*16}"
+            r"{\p0}"
+        )
+        events.append(bottom_band)
+        # 文字直下のさらに濃い帯 (y=870〜1540)
+        text_band = (
+            f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
+            r"{\an7\pos(0,870)\p4\bord0\shad0\1c&H000000&\1a&H28&}"
+            f"m 0 0 l {WIDTH*16} 0 l {WIDTH*16} {670*16} l 0 {670*16}"
+            r"{\p0}"
+        )
+        events.append(text_band)
+
+    # ----- Brand band (top) -----
+    add("Brand", BRAND, pos=(WIDTH // 2, 220))
+
+    # ----- Badge -----
     if scene.badge:
-        add("Badge", scene.badge, pos=(WIDTH // 2, 620))
-        # divider line drawn with \p1 vector drawing
+        add("Badge", scene.badge, pos=(WIDTH // 2, 600))
+        # divider line under badge
         divider = (
             f"Dialogue: 0,{start},{end},Title,,0,0,0,,"
-            r"{\an5\pos(540,820)\p1\c" + hex_to_ass_color(scene.badge_color) + r"}"
+            + fade
+            + r"{\an5\pos(540,790)\p1\bord0\shad0\1c" + hex_to_ass_color(scene.badge_color) + r"\1a&H20&}"
             "m 0 0 l 160 0 l 160 4 l 0 4"
             r"{\p0}"
         )
         events.append(divider)
 
-    # Title (centered, moved to upper-middle)
-    title_y = 960 if not scene.badge else 940
+    # ----- Title & Sub -----
+    title_y = 900 if not scene.badge else 900
     add("Title", scene.title, pos=(WIDTH // 2, title_y))
-
-    # Sub
-    sub_y = title_y + 150
+    sub_y = title_y + 140
     add("Sub", scene.sub, pos=(WIDTH // 2, sub_y))
 
-    # Caption (CTA) bottom
+    # ----- Caption (bottom CTA) -----
     if scene.caption:
         add("Caption", scene.caption)
 
@@ -194,25 +257,86 @@ Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour,
     return header + style_block + events_header + events_block
 
 
+# ---------- シーンレンダ ----------
+
+
+def build_video_filter(scene: Scene, ass_path: Path) -> str:
+    """Build the -vf filter chain for the scene."""
+    d_frames = int(round(scene.duration * FPS))
+    # Ken Burns のズーム量 (1.00 -> 1.12)
+    zmax = 1.12
+    if scene.zoom_dir == "in":
+        z_expr = f"'1.0+{zmax-1.0:.4f}*on/{d_frames}'"
+    else:  # "out": start zoomed, end at 1.0
+        z_expr = f"'{zmax:.4f}-{zmax-1.0:.4f}*on/{d_frames}'"
+
+    # Pre-scale and crop to 9:16 2x canvas for zoompan headroom.
+    # Source is ~5760x3840 (3:2). We scale height to 3840 (no-op), then
+    # center-crop width to 2160 → 2160x3840 @ 9:16.
+    cover_scale = f"scale=-1:3840:force_original_aspect_ratio=increase"
+    canvas_crop = f"crop=2160:3840:(in_w-2160)/2:(in_h-3840)/2"
+
+    # zoompan centers viewport and zooms over time. Output size 1080x1920.
+    kb = (
+        f"zoompan=z={z_expr}"
+        f":d={d_frames}"
+        f":s={WIDTH}x{HEIGHT}"
+        f":fps={FPS}"
+        f":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+    )
+
+    subs = f"subtitles={ass_path}:fontsdir=/usr/share/fonts"
+
+    if scene.image:
+        # eq で全体を軽くダーケン + コントラスト / 彩度を少し下げて
+        # テキスト可読性と落ち着いたトーンを両立させる
+        tone = "eq=brightness=-0.12:contrast=0.96:saturation=0.88"
+        return f"{cover_scale},{canvas_crop},{kb},{tone},{subs}"
+    return subs
+
+
 def render_scene(
     ffmpeg: str,
     scene: Scene,
     ass_path: Path,
     out_path: Path,
-    font_name: str,
 ) -> None:
-    bg = hex_to_ffmpeg_color(scene.bg_hex)
-    # fontsdir lets libass locate fonts on disk without relying on fontconfig
-    vf = f"subtitles={ass_path}:fontsdir=/usr/share/fonts"
-    cmd = [
+    vf = build_video_filter(scene, ass_path)
+
+    cmd: list[str] = [
         ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
-        "-f", "lavfi", "-i", f"color=c={bg}:s={WIDTH}x{HEIGHT}:r={FPS}:d={scene.duration}",
-        "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
-        "-vf", vf,
+    ]
+
+    if scene.image:
+        img_path = REPO_ROOT / scene.image
+        if not img_path.exists():
+            sys.exit(f"ERROR: image not found: {img_path}")
+        cmd += ["-loop", "1", "-framerate", str(FPS), "-t", f"{scene.duration}",
+                "-i", str(img_path)]
+    else:
+        bg = hex_to_ffmpeg_color(scene.bg_hex)
+        cmd += ["-f", "lavfi", "-i",
+                f"color=c={bg}:s={WIDTH}x{HEIGHT}:r={FPS}:d={scene.duration}"]
+
+    cmd += ["-f", "lavfi", "-i",
+            "anullsrc=channel_layout=stereo:sample_rate=48000"]
+
+    # Fade in/out applied on top of the main vf chain for a softer cut
+    fade_t = 0.4
+    vf_full = (
+        f"{vf},"
+        f"fade=t=in:st=0:d={fade_t},"
+        f"fade=t=out:st={max(0.0, scene.duration - fade_t):.3f}:d={fade_t}"
+    )
+
+    cmd += [
+        "-vf", vf_full,
         "-t", f"{scene.duration}",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+        "-r", str(FPS),
+        "-c:v", "libx264", "-preset", "medium", "-crf", "19",
         "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "128k", "-shortest",
+        "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2",
+        "-shortest",
         "-movflags", "+faststart",
         str(out_path),
     ]
@@ -225,6 +349,9 @@ def concat(ffmpeg: str, files: list[Path], out: Path) -> None:
             f.write(f"file '{p.resolve()}'\n")
         list_path = f.name
     try:
+        # Use concat demuxer with re-encode to guarantee identical stream
+        # parameters (some clips come from image loops, others from lavfi
+        # color — re-encoding normalizes container metadata).
         cmd = [
             ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
             "-f", "concat", "-safe", "0", "-i", list_path,
@@ -238,7 +365,7 @@ def concat(ffmpeg: str, files: list[Path], out: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    default_out = Path(__file__).resolve().parent.parent / "output" / "reel_w3_hikakukentou2.mp4"
+    default_out = REPO_ROOT / "output" / "reel_w3_hikakukentou2.mp4"
     parser.add_argument("--out", type=Path, default=default_out, help="output mp4 path")
     args = parser.parse_args()
 
@@ -257,8 +384,9 @@ def main() -> int:
             ass_file = tmp_path / f"scene_{i:02d}.ass"
             ass_file.write_text(build_scene_ass(scene, font_name), encoding="utf-8")
             mp4 = tmp_path / f"scene_{i:02d}.mp4"
-            print(f"  scene {i}: {scene.duration:>4.1f}s  {scene.title}")
-            render_scene(ffmpeg, scene, ass_file, mp4, font_name)
+            bg_label = f"img:{scene.image}" if scene.image else f"col:{scene.bg_hex}"
+            print(f"  scene {i}: {scene.duration:>4.1f}s  {bg_label:32s}  {scene.title}")
+            render_scene(ffmpeg, scene, ass_file, mp4)
             scene_files.append(mp4)
 
         print("concatenating...")
