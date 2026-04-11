@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """
-generate_reel.py
+generate_reel.py — v4 tempo-focused Reels generator.
 
-第3週：比較検討② — Instagram Reels 向け動画生成スクリプト.
-
-- 出力: 1080x1920 / 30fps / H.264 yuv420p / 無音 AAC / faststart
-- 背景は単色 or 実写画像 (Ken Burns 風ゆるやかなズーム)
-- テキストは libass (ffmpeg の subtitles フィルタ) 経由で日本語描画
-- 実写背景の上には下半分に黒のグラデ状オーバーレイを重ねて可読性を確保
+第3週「比較検討②」向け Instagram Reels。
+- 19.5 秒 / 13 カット / 平均 1.5 秒で切り替わるテンポ感
+- 実写は主役、テキストは黒背景のスラムカードか小さなタグで演出
+- Ken Burns は 1.00→1.20 程度の大きめのズームを in/out 交互に
+- ASS (\\t, \\fad, \\move) で "ポン" と出るテキストアニメーション
 
 使い方:
     python3 scripts/generate_reel.py
-    python3 scripts/generate_reel.py --out output/custom.mp4
+    python3 scripts/generate_reel.py --out output/draft.mp4
 """
 
 from __future__ import annotations
@@ -30,77 +29,95 @@ WIDTH = 1080
 HEIGHT = 1920
 FPS = 30
 
-# 色 (#RRGGBB)
-NAVY = "#0e1a2b"
-COAL = "#1a1410"
+BLACK = "#000000"
+COAL = "#0c0a09"
+CREAM = "#efe6d3"
 GOLD = "#c8a96a"
-CREAM = "#e9dfcb"
-WHITE = "#f5f5f5"
+WHITE = "#f6f3ec"
 SUB_GRAY = "#b8b0a2"
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+BRAND = "Zenen Shinsaibashi"
+
+# ---------- Scene ----------
 
 
 @dataclass
 class Scene:
+    kind: str                # "slam" | "photo" | "photo_tag" | "cta_wide" | "cta_text" | "bridge"
     duration: float
-    title: str
-    sub: str
-    bg_hex: str = COAL
-    image: str | None = None   # ファイル名 (REPO_ROOT 相対)
-    video: str | None = None   # 実写動画クリップ (REPO_ROOT 相対)
-    video_start: float = 0.0   # ソース内の開始秒
+    text: str = ""
+    sub: str = ""
+    tag_num: str = ""        # "01" 等の番号タグ
+    bg_hex: str = BLACK
+    image: str | None = None
+    video: str | None = None
     video_logo_box: tuple[int, int, int, int] | None = None
-    # ^ (x, y, w, h) ソース座標で塗りつぶす位置。透かし除去用
-    badge: str = ""
-    caption: str = ""
-    title_color: str = WHITE
-    sub_color: str = SUB_GRAY
-    badge_color: str = GOLD
-    caption_color: str = GOLD
-    zoom_dir: str = "in"  # "in" or "out"
+    crop_x_pct: float = 0.5  # 9:16 キャンバスの水平クロップ中心 (0.0–1.0)
+    zoom_start: float = 1.00
+    zoom_end: float = 1.20
 
 
 SCENES: list[Scene] = [
-    Scene(3.0, "大切な接待で", "失敗したくない方へ",
-          bg_hex=COAL, title_color=CREAM),
+    # 1. HOOK スラム
+    Scene("slam", 0.6, text="その接待、"),
 
-    Scene(3.0, "席が近い。声が響く。", "落ち着かない空間は、話も進まない。",
-          bg_hex=NAVY),
+    # 2. PROBLEM スラム
+    Scene("slam", 0.5, text="席、大丈夫？"),
 
-    Scene(4.0, "陽明 Youmei", "畳に市松、品格の個室",
-          image="陽明 Youmei.JPG",
-          badge="01", caption="2〜6名 / 完全個室",
-          zoom_dir="in"),
+    # 3. 陽明 ワイド
+    Scene("photo_tag", 1.7, text="陽明 Youmei", tag_num="01",
+          image="陽明 Youmei.JPG", crop_x_pct=0.5,
+          zoom_start=1.00, zoom_end=1.18),
 
-    Scene(4.0, "日月 Nichigetsu", "品のある和モダン",
-          image=" 日月 Nichigetsu02.JPG",
-          badge="02", caption="2〜6名 / 完全個室",
-          zoom_dir="out"),
+    # 4. 陽明 タイト (左寄せクロップ、逆ズーム)
+    Scene("photo", 1.3,
+          image="陽明 Youmei.JPG", crop_x_pct=0.30,
+          zoom_start=1.25, zoom_end=1.10),
 
-    Scene(4.0, "梨山 rizan", "茶器が彩る禅の空間",
-          image="梨山 rizan01.JPG",
-          badge="03", caption="7〜10名 / 完全個室",
-          zoom_dir="in"),
+    # 5. 日月 ワイド
+    Scene("photo_tag", 1.7, text="日月 Nichigetsu", tag_num="02",
+          image=" 日月 Nichigetsu02.JPG", crop_x_pct=0.5,
+          zoom_start=1.00, zoom_end=1.18),
 
-    Scene(3.0, "すべて完全個室", "守られる席間、静かな会話",
-          bg_hex=COAL, title_color=CREAM),
+    # 6. 日月 タイト (右寄せ)
+    Scene("photo", 1.3,
+          image=" 日月 Nichigetsu02.JPG", crop_x_pct=0.65,
+          zoom_start=1.25, zoom_end=1.10),
 
-    # 玄関の生け花ショット (設えの細やかさを見せる)
-    # 元動画 720x1280 / 2.07s / 右下にウォーターマーク
-    Scene(2.0, "細部まで、おもてなし", "季節の設えで、あなたを迎える",
+    # 7. 梨山 ワイド (茶器側)
+    Scene("photo_tag", 1.7, text="梨山 rizan", tag_num="03",
+          image="梨山 rizan01.JPG", crop_x_pct=0.5,
+          zoom_start=1.00, zoom_end=1.18),
+
+    # 8. 梨山 タイト
+    Scene("photo", 1.3,
+          image="梨山 rizan01.JPG", crop_x_pct=0.35,
+          zoom_start=1.22, zoom_end=1.08),
+
+    # 9. Spec スラム 1
+    Scene("slam", 0.8, text="すべて完全個室"),
+
+    # 10. Spec スラム 2
+    Scene("slam", 0.8, text="2〜10名 対応"),
+
+    # 11. 生け花ブリッジ
+    Scene("bridge", 2.0, text="細部まで、", sub="おもてなし",
           video="clideo_editor_e9c04e2420fe4c5fbf9ff8c0e9ab7f6a.mp4",
-          video_start=0.0,
-          video_logo_box=(400, 1185, 320, 85),
-          title_color=CREAM),
+          video_logo_box=(400, 1185, 320, 85)),
 
-    Scene(6.0, "大切な一席は", "心斎橋 禅園で",
-          image="陽明 Youmei.JPG",
-          caption="Instagramで詳細を見る",
-          title_color=CREAM, zoom_dir="out"),
+    # 12. CTA ワイド
+    Scene("cta_wide", 2.3, text="心斎橋 禅園",
+          image="陽明 Youmei.JPG", crop_x_pct=0.5,
+          zoom_start=1.05, zoom_end=1.20),
+
+    # 13. CTA クロージング
+    Scene("cta_text", 3.3,
+          text="プロフィールから", sub="ご予約・詳細",
+          image="陽明 Youmei.JPG", crop_x_pct=0.55,
+          zoom_start=1.25, zoom_end=1.08),
 ]
 
-BRAND = "Zenen Shinsaibashi"
 
 # ---------- ユーティリティ ----------
 
@@ -129,7 +146,6 @@ def find_font() -> tuple[str, str]:
 
 
 def hex_to_ass_color(hex_rgb: str) -> str:
-    """#RRGGBB -> &H00BBGGRR (ASS primary color, opaque)."""
     h = hex_rgb.lstrip("#")
     r, g, b = h[0:2], h[2:4], h[4:6]
     return f"&H00{b}{g}{r}".upper()
@@ -154,103 +170,154 @@ def build_scene_ass(scene: Scene, font_name: str) -> str:
     dur = scene.duration
     start = ass_ts(0.0)
     end = ass_ts(dur)
-    fade = r"{\fad(400,400)}"
 
-    # Instagram Reels のセーフエリアを意識:
-    # - top ~220px はアカウント情報
-    # - bottom ~400px はいいね/キャプション UI
-    # テキストは 260 〜 1520 の範囲に収める
-    # Brand band: y=200
-    # Badge: y=520
-    # Title: y=900 (no badge) / y=880 (with badge)
-    # Sub: Title + 150
-    # Caption: y=1440
-
+    # スタイル定義 (name, size, color, bold, alignment, marginV)
     styles = [
-        # name, size, color, bold, alignment, marginv
-        ("Brand", 44, hex_to_ass_color(CREAM), 0, 2, 140),
-        ("Title", 96, hex_to_ass_color(scene.title_color), -1, 5, 0),
-        ("Sub", 56, hex_to_ass_color(scene.sub_color), 0, 5, 0),
-        ("Badge", 200, hex_to_ass_color(scene.badge_color), -1, 5, 0),
-        ("Caption", 48, hex_to_ass_color(scene.caption_color), -1, 2, 460),
-        ("Overlay", 10, "&H00000000", 0, 7, 0),  # for shape drawing
+        ("Slam",     200, hex_to_ass_color(WHITE),  -1, 5, 0),
+        ("SlamAcc",  200, hex_to_ass_color(GOLD),   -1, 5, 0),
+        ("Tag",       56, hex_to_ass_color(CREAM),  -1, 1, 180),
+        ("TagNum",    38, hex_to_ass_color(GOLD),   -1, 1, 260),
+        ("Brand",     32, hex_to_ass_color(CREAM),   0, 9, 120),
+        ("CtaBig",   140, hex_to_ass_color(CREAM),  -1, 5, 0),
+        ("CtaSub",    56, hex_to_ass_color(SUB_GRAY), 0, 5, 0),
+        ("BridgeTitle", 96, hex_to_ass_color(CREAM), -1, 5, 0),
+        ("BridgeSub",   70, hex_to_ass_color(GOLD),  -1, 5, 0),
+        ("Overlay",    10, "&H00000000",              0, 7, 0),  # for shape drawing
     ]
-
-    style_lines = []
-    for name, size, color, bold, align, marginv in styles:
-        # Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour,
-        #         Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle,
-        #         BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-        style_lines.append(
-            f"Style: {name},{font_name},{size},{color},&H000000FF,&H00000000,&H64000000,"
-            f"{bold},0,0,0,100,100,0,0,1,0,0,{align},40,40,{marginv},1"
-        )
+    style_lines = [
+        f"Style: {name},{font_name},{size},{color},&H000000FF,"
+        f"&H00000000,&H64000000,{bold},0,0,0,100,100,0,0,1,0,0,"
+        f"{align},40,40,{marginv},1"
+        for (name, size, color, bold, align, marginv) in styles
+    ]
 
     events: list[str] = []
 
-    def add(style: str, text: str, pos: tuple[int, int] | None = None,
-            extra_tags: str = ""):
-        pos_tag = f"{{\\pos({pos[0]},{pos[1]})}}" if pos else ""
+    def dialogue(style: str, text: str) -> str:
+        return f"Dialogue: 0,{start},{end},{style},,0,0,0,,{text}"
+
+    def rect(color: str, alpha_hex: str, x: int, y: int, w: int, h: int) -> str:
+        """半透明塗りつぶし矩形 (ASS ベクター描画)。"""
+        return (
+            f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
+            f"{{\\an7\\pos({x},{y})\\p4\\bord0\\shad0\\1c{color}\\1a{alpha_hex}}}"
+            f"m 0 0 l {w*16} 0 l {w*16} {h*16} l 0 {h*16}"
+            f"{{\\p0}}"
+        )
+
+    if scene.kind == "slam":
+        # 真っ黒背景 + 巨大テキスト + ポップアップアニメーション
+        # 文字数が多いほどフォントを縮める (画面幅 1080 に収めるため)
+        n = len(scene.text)
+        if n <= 5:
+            slam_fs = 200
+        elif n <= 6:
+            slam_fs = 158
+        elif n <= 7:
+            slam_fs = 138
+        else:
+            slam_fs = 120
+        events.append(dialogue(
+            "Slam",
+            r"{\an5\pos(540,960)\fs" + str(slam_fs) +
+            r"\fad(40,60)\fscx85\fscy85\blur2"
+            r"\t(0,150,\fscx100\fscy100\blur0)}" + scene.text
+        ))
+        # 細い金のアクセントラインを下に入れる
         events.append(
-            f"Dialogue: 0,{start},{end},{style},,0,0,0,,{fade}{extra_tags}{pos_tag}{text}"
-        )
-
-    has_media_bg = scene.image is not None or scene.video is not None
-
-    # ----- 実写背景のときだけ、テキスト可読性のための暗幕レイヤーを敷く -----
-    # 画像全体の 20% ダーケンは ffmpeg の eq フィルタ側でやっているので、
-    # ここでは文字が来る領域を追加で暗く落とす。
-    if has_media_bg:
-        # 上の帯 (ブランド + バッジ領域) y=0〜820
-        top_band = (
             f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
-            r"{\an7\pos(0,0)\p4\bord0\shad0\1c&H000000&\1a&H58&}"
-            f"m 0 0 l {WIDTH*16} 0 l {WIDTH*16} {820*16} l 0 {820*16}"
-            r"{\p0}"
+            r"{\an5\pos(540,1080)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
+            r"\1a&H20&\fad(80,60)}m 0 0 l 120 0 l 120 3 l 0 3{\p0}"
         )
-        events.append(top_band)
-        # 下の帯 (タイトル〜キャプション) y=820〜1920
-        bottom_band = (
+
+    elif scene.kind == "photo_tag":
+        # 実写 + ブランド上バナー + 左下の番号タグ + ルーム名
+        # 上に薄いダーク帯 (ブランド用) 100px
+        events.append(rect("&H000000&", "&HA0&", 0, 0, WIDTH, 140))
+        # 左下のタグ用小さい暗塊 (高さ260, 幅600)
+        events.append(rect("&H000000&", "&H60&", 0, HEIGHT-310, 680, 310))
+        # ブランド (上中央)
+        events.append(dialogue(
+            "Brand",
+            r"{\fad(300,200)}" + BRAND
+        ))
+        # 番号タグ
+        if scene.tag_num:
+            events.append(dialogue(
+                "TagNum",
+                r"{\fad(200,200)\pos(80,1650)}" + scene.tag_num
+            ))
+            # タグ下の縦線
+            events.append(
+                f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
+                r"{\an7\pos(80,1700)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
+                r"\1a&H10&\fad(250,200)}m 0 0 l 60 0 l 60 3 l 0 3{\p0}"
+            )
+        # ルーム名 (下ワイプ風)
+        events.append(dialogue(
+            "Tag",
+            r"{\fad(250,200)\pos(80,1750)}" + scene.text
+        ))
+
+    elif scene.kind == "photo":
+        # テキストなしクリーンな実写カット
+        pass
+
+    elif scene.kind == "bridge":
+        # 動画背景 + ブランド上帯 + 中央大文字 + 下暗幕
+        events.append(rect("&H000000&", "&HA0&", 0, 0, WIDTH, 140))
+        events.append(rect("&H000000&", "&H50&", 0, 820, WIDTH, 1100))
+        events.append(dialogue(
+            "Brand",
+            r"{\fad(300,200)}" + BRAND
+        ))
+        events.append(dialogue(
+            "BridgeTitle",
+            r"{\an5\pos(540,1000)\fad(300,200)\fscx90\fscy90"
+            r"\t(0,300,\fscx100\fscy100)}" + scene.text
+        ))
+        events.append(dialogue(
+            "BridgeSub",
+            r"{\an5\pos(540,1140)\fad(400,200)}" + scene.sub
+        ))
+
+    elif scene.kind == "cta_wide":
+        # CTA 大文字。下から浮上 + フェード
+        events.append(rect("&H000000&", "&H60&", 0, 700, WIDTH, 500))
+        events.append(dialogue(
+            "CtaBig",
+            r"{\an5\move(540,1080,540,960,0,400)\fad(400,300)"
+            r"\fscx92\fscy92\t(0,400,\fscx100\fscy100)}" + scene.text
+        ))
+        # 金線アクセント
+        events.append(
             f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
-            r"{\an7\pos(0,820)\p4\bord0\shad0\1c&H000000&\1a&H38&}"
-            f"m 0 0 l {WIDTH*16} 0 l {WIDTH*16} {1100*16} l 0 {1100*16}"
-            r"{\p0}"
+            r"{\an5\pos(540,1080)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
+            r"\1a&H10&\fad(500,200)}m 0 0 l 120 0 l 120 4 l 0 4{\p0}"
         )
-        events.append(bottom_band)
-        # 文字直下のさらに濃い帯 (y=870〜1540)
-        text_band = (
-            f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
-            r"{\an7\pos(0,870)\p4\bord0\shad0\1c&H000000&\1a&H28&}"
-            f"m 0 0 l {WIDTH*16} 0 l {WIDTH*16} {670*16} l 0 {670*16}"
-            r"{\p0}"
-        )
-        events.append(text_band)
 
-    # ----- Brand band (top) -----
-    add("Brand", BRAND, pos=(WIDTH // 2, 220))
-
-    # ----- Badge -----
-    if scene.badge:
-        add("Badge", scene.badge, pos=(WIDTH // 2, 600))
-        # divider line under badge
-        divider = (
-            f"Dialogue: 0,{start},{end},Title,,0,0,0,,"
-            + fade
-            + r"{\an5\pos(540,790)\p1\bord0\shad0\1c" + hex_to_ass_color(scene.badge_color) + r"\1a&H20&}"
-            "m 0 0 l 160 0 l 160 4 l 0 4"
-            r"{\p0}"
-        )
-        events.append(divider)
-
-    # ----- Title & Sub -----
-    title_y = 900 if not scene.badge else 900
-    add("Title", scene.title, pos=(WIDTH // 2, title_y))
-    sub_y = title_y + 140
-    add("Sub", scene.sub, pos=(WIDTH // 2, sub_y))
-
-    # ----- Caption (bottom CTA) -----
-    if scene.caption:
-        add("Caption", scene.caption)
+    elif scene.kind == "cta_text":
+        # 上にブランド、中央にメインテキスト + サブ、下にタップ誘導
+        events.append(rect("&H000000&", "&H70&", 0, 0, WIDTH, 240))
+        events.append(rect("&H000000&", "&H50&", 0, 700, WIDTH, 1220))
+        events.append(dialogue(
+            "Brand",
+            r"{\fad(300,0)}" + BRAND
+        ))
+        # CtaBig style is 140 — for stacked layout shrink via tags
+        events.append(dialogue(
+            "CtaBig",
+            r"{\an5\pos(540,900)\fad(500,0)\fscx78\fscy78}" + scene.text
+        ))
+        events.append(dialogue(
+            "CtaSub",
+            r"{\an5\pos(540,1030)\fad(700,0)}" + scene.sub
+        ))
+        # 下部の小さい指示テキスト
+        events.append(dialogue(
+            "Brand",
+            r"{\an2\pos(540,1780)\fad(900,0)}" + "↑ Instagramのプロフィールへ"
+        ))
 
     header = f"""[Script Info]
 Title: Scene
@@ -273,23 +340,22 @@ Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour,
 
 
 def build_video_filter(scene: Scene, ass_path: Path) -> str:
-    """Build the -vf filter chain for the scene."""
-    d_frames = int(round(scene.duration * FPS))
-    # Ken Burns のズーム量 (1.00 -> 1.12)
-    zmax = 1.12
-    if scene.zoom_dir == "in":
-        z_expr = f"'1.0+{zmax-1.0:.4f}*on/{d_frames}'"
-    else:  # "out": start zoomed, end at 1.0
-        z_expr = f"'{zmax:.4f}-{zmax-1.0:.4f}*on/{d_frames}'"
+    d_frames = max(1, int(round(scene.duration * FPS)))
+    z0, z1 = scene.zoom_start, scene.zoom_end
+    z_expr = f"'{z0:.4f}+({z1-z0:+.4f})*on/{d_frames}'"
 
-    # 共通: テキスト可読性と落ち着いたトーンのための色調補正
-    tone = "eq=brightness=-0.12:contrast=0.96:saturation=0.88"
+    # 実写を多少だけトーン調整 (自然な色を残す)
+    tone = "eq=brightness=-0.04:contrast=1.02:saturation=0.95"
     subs = f"subtitles={ass_path}:fontsdir=/usr/share/fonts"
 
     if scene.image:
-        # 静止画: 2倍キャンバスにカバースケール → Ken Burns → トーン → 字幕
+        # 9:16 2x キャンバス (2160x3840) に可変位置でクロップ
         cover_scale = "scale=-1:3840:force_original_aspect_ratio=increase"
-        canvas_crop = "crop=2160:3840:(in_w-2160)/2:(in_h-3840)/2"
+        # crop x = (in_w - 2160) * crop_x_pct
+        canvas_crop = (
+            f"crop=2160:3840:"
+            f"(in_w-2160)*{scene.crop_x_pct:.3f}:(in_h-3840)/2"
+        )
         kb = (
             f"zoompan=z={z_expr}"
             f":d={d_frames}"
@@ -300,7 +366,6 @@ def build_video_filter(scene: Scene, ass_path: Path) -> str:
         return f"{cover_scale},{canvas_crop},{kb},{tone},{subs}"
 
     if scene.video:
-        # 動画クリップ: 透かし塗りつぶし → 9:16 cover scale → fps 変換 → トーン → 字幕
         parts = []
         if scene.video_logo_box:
             x, y, w, h = scene.video_logo_box
@@ -314,21 +379,13 @@ def build_video_filter(scene: Scene, ass_path: Path) -> str:
         ]
         return ",".join(parts)
 
-    # 単色背景
     return subs
 
 
-def render_scene(
-    ffmpeg: str,
-    scene: Scene,
-    ass_path: Path,
-    out_path: Path,
-) -> None:
+def render_scene(ffmpeg: str, scene: Scene, ass_path: Path, out_path: Path) -> None:
     vf = build_video_filter(scene, ass_path)
 
-    cmd: list[str] = [
-        ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
-    ]
+    cmd: list[str] = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error"]
 
     if scene.image:
         img_path = REPO_ROOT / scene.image
@@ -340,9 +397,7 @@ def render_scene(
         vid_path = REPO_ROOT / scene.video
         if not vid_path.exists():
             sys.exit(f"ERROR: video not found: {vid_path}")
-        # 映像だけ採用し、音声は後段で anullsrc に差し替える
-        cmd += ["-ss", f"{scene.video_start}", "-t", f"{scene.duration}",
-                "-i", str(vid_path)]
+        cmd += ["-ss", "0", "-t", f"{scene.duration}", "-i", str(vid_path)]
     else:
         bg = hex_to_ffmpeg_color(scene.bg_hex)
         cmd += ["-f", "lavfi", "-i",
@@ -351,12 +406,13 @@ def render_scene(
     cmd += ["-f", "lavfi", "-i",
             "anullsrc=channel_layout=stereo:sample_rate=48000"]
 
-    # Fade in/out applied on top of the main vf chain for a softer cut
-    fade_t = 0.4
+    # ごく短いフェード (ハードカット感を残しつつ黒フレーム防止)
+    fade_t = 0.08 if scene.kind != "slam" else 0.04
+    fade_out_st = max(0.0, scene.duration - fade_t)
     vf_full = (
         f"{vf},"
         f"fade=t=in:st=0:d={fade_t},"
-        f"fade=t=out:st={max(0.0, scene.duration - fade_t):.3f}:d={fade_t}"
+        f"fade=t=out:st={fade_out_st:.3f}:d={fade_t}"
     )
 
     cmd += [
@@ -380,9 +436,6 @@ def concat(ffmpeg: str, files: list[Path], out: Path) -> None:
             f.write(f"file '{p.resolve()}'\n")
         list_path = f.name
     try:
-        # Use concat demuxer with re-encode to guarantee identical stream
-        # parameters (some clips come from image loops, others from lavfi
-        # color — re-encoding normalizes container metadata).
         cmd = [
             ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
             "-f", "concat", "-safe", "0", "-i", list_path,
@@ -397,7 +450,7 @@ def concat(ffmpeg: str, files: list[Path], out: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     default_out = REPO_ROOT / "output" / "reel_w3_hikakukentou2.mp4"
-    parser.add_argument("--out", type=Path, default=default_out, help="output mp4 path")
+    parser.add_argument("--out", type=Path, default=default_out)
     args = parser.parse_args()
 
     ffmpeg = find_ffmpeg()
@@ -411,25 +464,29 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
         scene_files: list[Path] = []
+        running = 0.0
         for i, scene in enumerate(SCENES):
             ass_file = tmp_path / f"scene_{i:02d}.ass"
             ass_file.write_text(build_scene_ass(scene, font_name), encoding="utf-8")
             mp4 = tmp_path / f"scene_{i:02d}.mp4"
             if scene.image:
-                bg_label = f"img:{scene.image}"
+                bg = f"img:{scene.image[:28]}"
             elif scene.video:
-                bg_label = f"vid:{scene.video[:32]}"
+                bg = "vid:clideo"
             else:
-                bg_label = f"col:{scene.bg_hex}"
-            print(f"  scene {i}: {scene.duration:>4.1f}s  {bg_label:32s}  {scene.title}")
+                bg = "blk"
+            label = scene.text or scene.sub or "(clean)"
+            print(f"  [{i:>2}] t={running:05.2f}s +{scene.duration:.1f}s  "
+                  f"{scene.kind:10s} {bg:32s} {label}")
             render_scene(ffmpeg, scene, ass_file, mp4)
             scene_files.append(mp4)
+            running += scene.duration
 
         print("concatenating...")
         concat(ffmpeg, scene_files, args.out)
 
     size = args.out.stat().st_size
-    print(f"done: {args.out} ({size / 1024:.1f} KB)")
+    print(f"done: {args.out} ({size / 1024:.1f} KB, {running:.1f}s)")
     return 0
 
 
