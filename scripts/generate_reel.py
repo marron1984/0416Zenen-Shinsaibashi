@@ -47,7 +47,11 @@ class Scene:
     title: str
     sub: str
     bg_hex: str = COAL
-    image: str | None = None  # ファイル名 (REPO_ROOT 相対)
+    image: str | None = None   # ファイル名 (REPO_ROOT 相対)
+    video: str | None = None   # 実写動画クリップ (REPO_ROOT 相対)
+    video_start: float = 0.0   # ソース内の開始秒
+    video_logo_box: tuple[int, int, int, int] | None = None
+    # ^ (x, y, w, h) ソース座標で塗りつぶす位置。透かし除去用
     badge: str = ""
     caption: str = ""
     title_color: str = WHITE
@@ -81,6 +85,14 @@ SCENES: list[Scene] = [
 
     Scene(3.0, "すべて完全個室", "守られる席間、静かな会話",
           bg_hex=COAL, title_color=CREAM),
+
+    # 玄関の生け花ショット (設えの細やかさを見せる)
+    # 元動画 720x1280 / 2.07s / 右下にウォーターマーク
+    Scene(2.0, "細部まで、おもてなし", "季節の設えで、あなたを迎える",
+          video="clideo_editor_e9c04e2420fe4c5fbf9ff8c0e9ab7f6a.mp4",
+          video_start=0.0,
+          video_logo_box=(400, 1185, 320, 85),
+          title_color=CREAM),
 
     Scene(6.0, "大切な一席は", "心斎橋 禅園で",
           image="陽明 Youmei.JPG",
@@ -183,12 +195,12 @@ def build_scene_ass(scene: Scene, font_name: str) -> str:
             f"Dialogue: 0,{start},{end},{style},,0,0,0,,{fade}{extra_tags}{pos_tag}{text}"
         )
 
-    is_photo = scene.image is not None
+    has_media_bg = scene.image is not None or scene.video is not None
 
     # ----- 実写背景のときだけ、テキスト可読性のための暗幕レイヤーを敷く -----
     # 画像全体の 20% ダーケンは ffmpeg の eq フィルタ側でやっているので、
     # ここでは文字が来る領域を追加で暗く落とす。
-    if is_photo:
+    if has_media_bg:
         # 上の帯 (ブランド + バッジ領域) y=0〜820
         top_band = (
             f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
@@ -270,28 +282,39 @@ def build_video_filter(scene: Scene, ass_path: Path) -> str:
     else:  # "out": start zoomed, end at 1.0
         z_expr = f"'{zmax:.4f}-{zmax-1.0:.4f}*on/{d_frames}'"
 
-    # Pre-scale and crop to 9:16 2x canvas for zoompan headroom.
-    # Source is ~5760x3840 (3:2). We scale height to 3840 (no-op), then
-    # center-crop width to 2160 → 2160x3840 @ 9:16.
-    cover_scale = f"scale=-1:3840:force_original_aspect_ratio=increase"
-    canvas_crop = f"crop=2160:3840:(in_w-2160)/2:(in_h-3840)/2"
-
-    # zoompan centers viewport and zooms over time. Output size 1080x1920.
-    kb = (
-        f"zoompan=z={z_expr}"
-        f":d={d_frames}"
-        f":s={WIDTH}x{HEIGHT}"
-        f":fps={FPS}"
-        f":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
-    )
-
+    # 共通: テキスト可読性と落ち着いたトーンのための色調補正
+    tone = "eq=brightness=-0.12:contrast=0.96:saturation=0.88"
     subs = f"subtitles={ass_path}:fontsdir=/usr/share/fonts"
 
     if scene.image:
-        # eq で全体を軽くダーケン + コントラスト / 彩度を少し下げて
-        # テキスト可読性と落ち着いたトーンを両立させる
-        tone = "eq=brightness=-0.12:contrast=0.96:saturation=0.88"
+        # 静止画: 2倍キャンバスにカバースケール → Ken Burns → トーン → 字幕
+        cover_scale = "scale=-1:3840:force_original_aspect_ratio=increase"
+        canvas_crop = "crop=2160:3840:(in_w-2160)/2:(in_h-3840)/2"
+        kb = (
+            f"zoompan=z={z_expr}"
+            f":d={d_frames}"
+            f":s={WIDTH}x{HEIGHT}"
+            f":fps={FPS}"
+            f":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+        )
         return f"{cover_scale},{canvas_crop},{kb},{tone},{subs}"
+
+    if scene.video:
+        # 動画クリップ: 透かし塗りつぶし → 9:16 cover scale → fps 変換 → トーン → 字幕
+        parts = []
+        if scene.video_logo_box:
+            x, y, w, h = scene.video_logo_box
+            parts.append(f"drawbox=x={x}:y={y}:w={w}:h={h}:color=black:t=fill")
+        parts += [
+            f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase",
+            f"crop={WIDTH}:{HEIGHT}",
+            f"fps={FPS}",
+            tone,
+            subs,
+        ]
+        return ",".join(parts)
+
+    # 単色背景
     return subs
 
 
@@ -313,6 +336,13 @@ def render_scene(
             sys.exit(f"ERROR: image not found: {img_path}")
         cmd += ["-loop", "1", "-framerate", str(FPS), "-t", f"{scene.duration}",
                 "-i", str(img_path)]
+    elif scene.video:
+        vid_path = REPO_ROOT / scene.video
+        if not vid_path.exists():
+            sys.exit(f"ERROR: video not found: {vid_path}")
+        # 映像だけ採用し、音声は後段で anullsrc に差し替える
+        cmd += ["-ss", f"{scene.video_start}", "-t", f"{scene.duration}",
+                "-i", str(vid_path)]
     else:
         bg = hex_to_ffmpeg_color(scene.bg_hex)
         cmd += ["-f", "lavfi", "-i",
@@ -331,6 +361,7 @@ def render_scene(
 
     cmd += [
         "-vf", vf_full,
+        "-map", "0:v", "-map", "1:a",
         "-t", f"{scene.duration}",
         "-r", str(FPS),
         "-c:v", "libx264", "-preset", "medium", "-crf", "19",
@@ -384,7 +415,12 @@ def main() -> int:
             ass_file = tmp_path / f"scene_{i:02d}.ass"
             ass_file.write_text(build_scene_ass(scene, font_name), encoding="utf-8")
             mp4 = tmp_path / f"scene_{i:02d}.mp4"
-            bg_label = f"img:{scene.image}" if scene.image else f"col:{scene.bg_hex}"
+            if scene.image:
+                bg_label = f"img:{scene.image}"
+            elif scene.video:
+                bg_label = f"vid:{scene.video[:32]}"
+            else:
+                bg_label = f"col:{scene.bg_hex}"
             print(f"  scene {i}: {scene.duration:>4.1f}s  {bg_label:32s}  {scene.title}")
             render_scene(ffmpeg, scene, ass_file, mp4)
             scene_files.append(mp4)
