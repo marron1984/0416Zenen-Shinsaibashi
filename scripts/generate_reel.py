@@ -66,77 +66,63 @@ STORE_INFO = {
 
 @dataclass
 class Scene:
-    kind: str                # "photo_intro" | "text_black" | "photo_tag" | "bridge" |
-                             # "brand_reveal" | "info_card" | "cta_final"
+    kind: str                # "photo_tag" | "photo_text" | "photo_brand" |
+                             # "photo_info" | "photo_cta"
     duration: float
     text: str = ""
     sub: str = ""
-    bg_hex: str = BLACK
+    bg_hex: str = BLACK  # (unused in v7 — 全シーン写真背景)
     image: str | None = None
-    video: str | None = None
+    video: str | None = None  # (legacy, 未使用)
     video_logo_box: tuple[int, int, int, int] | None = None
     crop_x_pct: float = 0.5
     zoom_start: float = 1.00
     zoom_end: float = 1.08
+    # 写真背景のダーケン量 (0.0–0.5) と gblur シグマ
+    # テキストを重ねる時に写真を沈めて可読性を確保する
+    bg_darken: float = 0.0
+    bg_blur: int = 0
 
 
 SCENES: list[Scene] = [
-    # 1. 陽明 ワイド + タグ
-    Scene("photo_tag", 3.3, text="陽明  Youmei", sub="2〜6名様",
+    # 1. 陽明 + タグ
+    Scene("photo_tag", 4.0, text="陽明  Youmei", sub="2〜6名様",
           image="陽明 Youmei.JPG", crop_x_pct=0.5,
           zoom_start=1.00, zoom_end=1.08),
 
-    # 2. 陽明 タイト (左寄せ / 丸窓側)
-    Scene("photo", 2.2,
-          image="陽明 Youmei.JPG", crop_x_pct=0.30,
-          zoom_start=1.08, zoom_end=1.00),
-
-    # 3. 日月01 + タグ
-    Scene("photo_tag", 3.0, text="日月  Nichigetsu", sub="2〜6名様",
+    # 2. 日月 + タグ
+    Scene("photo_tag", 4.0, text="日月  Nichigetsu", sub="2〜6名様",
           image=" 日月 Nichigetsu01 .JPG", crop_x_pct=0.5,
           zoom_start=1.00, zoom_end=1.08),
 
-    # 4. 日月02 別アングル
-    Scene("photo", 2.0,
-          image=" 日月 Nichigetsu02.JPG", crop_x_pct=0.5,
-          zoom_start=1.08, zoom_end=1.00),
-
-    # 5. 日月03 別アングル
-    Scene("photo", 2.0,
-          image=" 日月 Nichigetsu03 .JPG", crop_x_pct=0.55,
-          zoom_start=1.00, zoom_end=1.08),
-
-    # 6. 梨山01 + タグ (茶器)
-    Scene("photo_tag", 3.0, text="梨山  rizan", sub="7〜10名様",
+    # 3. 梨山 + タグ (茶器)
+    Scene("photo_tag", 4.0, text="梨山  rizan", sub="7〜10名様",
           image="梨山 rizan01.JPG", crop_x_pct=0.45,
           zoom_start=1.00, zoom_end=1.08),
 
-    # 7. 梨山02 別アングル
-    Scene("photo", 2.0,
+    # 4. 写真の上にテキスト「すべて、完全個室。」
+    Scene("photo_text", 3.2, text="すべて、完全個室。",
+          image=" 日月 Nichigetsu02.JPG", crop_x_pct=0.5,
+          zoom_start=1.08, zoom_end=1.00,
+          bg_darken=0.22, bg_blur=5),
+
+    # 5. 写真の上にブランド「心斎橋 禅園 / Shinsaibashi Zenen」
+    Scene("photo_brand", 3.3, text="心斎橋　禅園", sub="Shinsaibashi Zenen",
           image="梨山 rizan02.JPG", crop_x_pct=0.5,
-          zoom_start=1.08, zoom_end=1.00),
+          zoom_start=1.05, zoom_end=1.00,
+          bg_darken=0.24, bg_blur=5),
 
-    # 8. 梨山03 別アングル
-    Scene("photo", 2.0,
+    # 6. 写真の上に店舗情報カード
+    Scene("photo_info", 6.5,
+          image=" 日月 Nichigetsu03 .JPG", crop_x_pct=0.5,
+          zoom_start=1.00, zoom_end=1.04,
+          bg_darken=0.38, bg_blur=12),
+
+    # 7. 写真の上に CTA「詳しくは、プロフィールへ。」
+    Scene("photo_cta", 3.0, text="詳しくは、プロフィールへ。",
           image="梨山 rizan03.JPG", crop_x_pct=0.5,
-          zoom_start=1.00, zoom_end=1.08),
-
-    # 9. 黒背景 まとめのテキスト
-    Scene("text_black", 2.3, text="すべて、完全個室。"),
-
-    # 10. 生け花 ブリッジ
-    Scene("bridge", 2.0, text="細やかな、おもてなし。",
-          video="clideo_editor_e9c04e2420fe4c5fbf9ff8c0e9ab7f6a.mp4",
-          video_logo_box=(400, 1185, 320, 85)),
-
-    # 11. ブランド露出
-    Scene("brand_reveal", 2.5, text="心斎橋　禅園", sub="Shinsaibashi Zenen"),
-
-    # 12. インフォカード
-    Scene("info_card", 5.5),
-
-    # 13. CTA
-    Scene("cta_final", 2.5, text="詳しくは、プロフィールへ。"),
+          zoom_start=1.05, zoom_end=1.00,
+          bg_darken=0.24, bg_blur=5),
 ]
 
 
@@ -265,25 +251,9 @@ def build_scene_ass(scene: Scene, font_name: str) -> str:
 
     # ---------- kind 別のイベント生成 ----------
 
-    if scene.kind == "text_black":
-        fs = auto_slam_fs(scene.text, base=62)
-        # 上に細い金線、下にメインテキスト、ゆっくりフェード
-        events.append(
-            f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
-            r"{\an5\pos(540,900)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
-            r"\1a&H20&\fad(700,500)}m 0 0 l 80 0 l 80 2 l 0 2{\p0}"
-        )
-        events.append(dialogue(
-            "TextBlack",
-            r"{\an5\pos(540,980)\fs" + str(fs) +
-            r"\fsp6\fad(900,600)}" + scene.text
-        ))
-
-    elif scene.kind == "photo_tag":
+    if scene.kind == "photo_tag":
         # エディトリアル風: 明朝の小さめテキストを左下に添える
-        # 薄いダーク帯 (120px) で軽く下地を作り、アウトラインで可読性を担保
         events.append(rect("&HA8&", 0, HEIGHT - 160, WIDTH, 160))
-        # 右上ブランドマーク
         events.append(dialogue(
             "Brand",
             r"{\fad(1100,600)\fsp4}" + BRAND
@@ -294,34 +264,31 @@ def build_scene_ass(scene: Scene, font_name: str) -> str:
             r"{\an7\pos(80,1780)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
             r"\1a&H10&\fad(900,600)}m 0 0 l 2 0 l 2 80 l 0 80{\p0}"
         )
-        # ルーム名 (金線の右)
         events.append(dialogue(
             "Tag",
             r"{\fad(900,600)\pos(110,1788)\fsp2}" + scene.text
         ))
-        # キャパシティ
         events.append(dialogue(
             "TagSub",
             r"{\fad(1100,600)\pos(110,1838)\fsp4}" + scene.sub
         ))
 
-    elif scene.kind == "photo":
-        # クリーン: テキスト無し
-        pass
-
-    elif scene.kind == "bridge":
-        # 生け花動画 + 下帯暗幕 + 中央テキスト
-        # clideo.com 透かしは drawbox で黒塗りしているが、
-        # 半透明のオーバーレイだと境目が見えてしまうので、
-        # 下 500px は完全不透明の黒で覆って透かしと同化させる
-        events.append(rect("&H00&", 0, HEIGHT - 500, WIDTH, 500))
+    elif scene.kind == "photo_text":
+        # 暗くぼかした写真の上に中央のテキスト
+        fs = auto_slam_fs(scene.text, base=68)
+        events.append(
+            f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
+            r"{\an5\pos(540,900)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
+            r"\1a&H20&\fad(700,500)}m 0 0 l 80 0 l 80 2 l 0 2{\p0}"
+        )
         events.append(dialogue(
-            "BridgeText",
-            r"{\an5\pos(540,1650)\fsp4\fad(700,500)}" + scene.text
+            "TextBlack",
+            r"{\an5\pos(540,990)\fs" + str(fs) +
+            r"\fsp6\fad(900,600)}" + scene.text
         ))
 
-    elif scene.kind == "brand_reveal":
-        # 小さめの店名 + 金線 + 英語。広い余白で editorial な佇まい
+    elif scene.kind == "photo_brand":
+        # 暗くぼかした写真の上にブランド店名 + 英語
         events.append(dialogue(
             "BrandBig",
             r"{\an5\pos(540,910)\fsp10\fad(900,600)}" + scene.text
@@ -336,10 +303,9 @@ def build_scene_ass(scene: Scene, font_name: str) -> str:
             r"{\an5\pos(540,1020)\fsp6\fad(1200,500)}" + scene.sub
         ))
 
-    elif scene.kind == "info_card":
-        # 店舗情報。スタッガード・フェードで順番に立ち上げる
+    elif scene.kind == "photo_info":
+        # 暗くぼかした写真の上に店舗情報をスタッガード・フェードで
         fade_out_start_ms = end_ms - 500
-        # (style, y, text, delay_ms, letter_spacing)
         lines = [
             ("InfoName",   580, STORE_INFO["name_jp"], 200,  8),
             ("InfoEn",     680, STORE_INFO["name_en"], 400,  6),
@@ -360,7 +326,6 @@ def build_scene_ass(scene: Scene, font_name: str) -> str:
                                fade_out_ms=500)
                 + "}" + text
             ))
-        # 店名下の金線
         events.append(
             f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
             r"{\an5\pos(540,735)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
@@ -369,7 +334,6 @@ def build_scene_ass(scene: Scene, font_name: str) -> str:
                                        fade_out_ms=500) + r"}"
             "m 0 0 l 80 0 l 80 2 l 0 2{\\p0}"
         )
-        # 下部誘導
         events.append(dialogue(
             "InfoHint",
             r"{\fsp4" + stagger_fade(2000, rise_ms=800,
@@ -377,20 +341,19 @@ def build_scene_ass(scene: Scene, font_name: str) -> str:
                                      fade_out_ms=500) + r"}" + STORE_INFO["cta_hint"]
         ))
 
-    elif scene.kind == "cta_final":
+    elif scene.kind == "photo_cta":
+        # 暗くぼかした写真の上に CTA テキスト + ブランド
         fs = auto_slam_fs(scene.text, base=58)
         events.append(dialogue(
             "Cta",
             r"{\an5\pos(540,920)\fs" + str(fs) +
             r"\fsp6\fad(900,500)}" + scene.text
         ))
-        # 装飾金線
         events.append(
             f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
             r"{\an5\pos(540,990)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
             r"\1a&H20&\fad(1100,500)}m 0 0 l 90 0 l 90 2 l 0 2{\p0}"
         )
-        # ブランドを下に小さく
         events.append(dialogue(
             "Brand",
             r"{\an5\pos(540,1040)\fsp4\fad(1300,500)}" + BRAND
@@ -421,8 +384,14 @@ def build_video_filter(scene: Scene, ass_path: Path) -> str:
     z0, z1 = scene.zoom_start, scene.zoom_end
     z_expr = f"'{z0:.4f}+({z1-z0:+.4f})*on/{d_frames}'"
 
-    # 自然な色を残しつつ、ほんの少しだけトーンを沈める
-    tone = "eq=brightness=-0.03:contrast=1.02:saturation=0.94"
+    # テキスト重ねシーンで写真を沈めて可読性を担保
+    brightness = -0.03 - scene.bg_darken
+    saturation = max(0.4, 0.94 - scene.bg_darken * 0.8)
+    tone = (
+        f"eq=brightness={brightness:.3f}:"
+        f"contrast=1.02:saturation={saturation:.3f}"
+    )
+    blur = f",gblur=sigma={scene.bg_blur}" if scene.bg_blur > 0 else ""
     subs = f"subtitles={ass_path}:fontsdir=/usr/share/fonts"
 
     if scene.image:
@@ -438,22 +407,9 @@ def build_video_filter(scene: Scene, ass_path: Path) -> str:
             f":fps={FPS}"
             f":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
         )
-        return f"{cover_scale},{canvas_crop},{kb},{tone},{subs}"
+        return f"{cover_scale},{canvas_crop},{kb},{tone}{blur},{subs}"
 
-    if scene.video:
-        parts = []
-        if scene.video_logo_box:
-            x, y, w, h = scene.video_logo_box
-            parts.append(f"drawbox=x={x}:y={y}:w={w}:h={h}:color=black:t=fill")
-        parts += [
-            f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase",
-            f"crop={WIDTH}:{HEIGHT}",
-            f"fps={FPS}",
-            tone,
-            subs,
-        ]
-        return ",".join(parts)
-
+    # フォールバック: 単色背景 (v7 では使用されない)
     return subs
 
 
@@ -468,12 +424,8 @@ def render_scene(ffmpeg: str, scene: Scene, ass_path: Path, out_path: Path) -> N
             sys.exit(f"ERROR: image not found: {img_path}")
         cmd += ["-loop", "1", "-framerate", str(FPS), "-t", f"{scene.duration}",
                 "-i", str(img_path)]
-    elif scene.video:
-        vid_path = REPO_ROOT / scene.video
-        if not vid_path.exists():
-            sys.exit(f"ERROR: video not found: {vid_path}")
-        cmd += ["-ss", "0", "-t", f"{scene.duration}", "-i", str(vid_path)]
     else:
+        # v7 では到達しない想定だが保険で単色背景
         bg = hex_to_ffmpeg_color(scene.bg_hex)
         cmd += ["-f", "lavfi", "-i",
                 f"color=c={bg}:s={WIDTH}x{HEIGHT}:r={FPS}:d={scene.duration}"]
