@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-generate_reel.py — v5 high-end, slow, cinematic Reels generator.
+generate_reel.py — v6 editorial Mincho Reels generator.
 
 第3週「比較検討②」向け Instagram Reels。
-高級業態向けの落ち着いたトーンを重視:
+高級業態向けのエディトリアル/マガジン調:
 
-- 31 秒 / 9 カット / 平均 3.4 秒の余白のあるペース
-- Ken Burns は 1.00–1.10 のごく控えめなズーム
-- テキストは断定調・短文で静かに立ち上げる (ポップアップなし)
-- 実店舗情報をスタッガード・フェードで表示するインフォカード
-- クロスフェード風の長め (0.35s) フェードで繋ぎをまろやかに
+- 32 秒 / 13 カット / うち 8 カットが実写 (写真優位)
+- 明朝体 (IPAexMincho) でエレガントなセリフ表現
+- 全体的に小さめのフォント、余白重視の editorial レイアウト
+- 各個室ごとにワイド→タイト/別アングルの複数カットで見せる
+- 店舗情報はスタッガード・フェードで順次表示
 
 使い方:
     python3 scripts/generate_reel.py
@@ -75,42 +75,62 @@ class Scene:
 
 
 SCENES: list[Scene] = [
-    # 1. オープニング (陽明 — ゆるやかに引き、途中でテキストが立ち上がる)
-    Scene("photo_intro", 3.0, text="大切な、ひと席を。",
-          image="陽明 Youmei.JPG", crop_x_pct=0.5,
-          zoom_start=1.10, zoom_end=1.00),
-
-    # 2. 黒背景 テキストカード
-    Scene("text_black", 2.5, text="すべて、完全個室。"),
-
-    # 3. 陽明 (中央クロップ / ゆっくりズームイン)
-    Scene("photo_tag", 4.0, text="陽明   Youmei", sub="2〜6名様",
+    # 1. 陽明 ワイド + タグ
+    Scene("photo_tag", 3.3, text="陽明  Youmei", sub="2〜6名様",
           image="陽明 Youmei.JPG", crop_x_pct=0.5,
           zoom_start=1.00, zoom_end=1.08),
 
-    # 4. 日月 (中央クロップ / ゆっくりズームアウト)
-    Scene("photo_tag", 4.0, text="日月   Nichigetsu", sub="2〜6名様",
+    # 2. 陽明 タイト (左寄せ / 丸窓側)
+    Scene("photo", 2.2,
+          image="陽明 Youmei.JPG", crop_x_pct=0.30,
+          zoom_start=1.08, zoom_end=1.00),
+
+    # 3. 日月01 + タグ
+    Scene("photo_tag", 3.0, text="日月  Nichigetsu", sub="2〜6名様",
+          image=" 日月 Nichigetsu01 .JPG", crop_x_pct=0.5,
+          zoom_start=1.00, zoom_end=1.08),
+
+    # 4. 日月02 別アングル
+    Scene("photo", 2.0,
           image=" 日月 Nichigetsu02.JPG", crop_x_pct=0.5,
           zoom_start=1.08, zoom_end=1.00),
 
-    # 5. 梨山 (やや左寄せで茶器側を入れる)
-    Scene("photo_tag", 4.0, text="梨山   rizan", sub="7〜10名様",
+    # 5. 日月03 別アングル
+    Scene("photo", 2.0,
+          image=" 日月 Nichigetsu03 .JPG", crop_x_pct=0.55,
+          zoom_start=1.00, zoom_end=1.08),
+
+    # 6. 梨山01 + タグ (茶器)
+    Scene("photo_tag", 3.0, text="梨山  rizan", sub="7〜10名様",
           image="梨山 rizan01.JPG", crop_x_pct=0.45,
           zoom_start=1.00, zoom_end=1.08),
 
-    # 6. 生け花 ブリッジ (季節の設え)
+    # 7. 梨山02 別アングル
+    Scene("photo", 2.0,
+          image="梨山 rizan02.JPG", crop_x_pct=0.5,
+          zoom_start=1.08, zoom_end=1.00),
+
+    # 8. 梨山03 別アングル
+    Scene("photo", 2.0,
+          image="梨山 rizan03.JPG", crop_x_pct=0.5,
+          zoom_start=1.00, zoom_end=1.08),
+
+    # 9. 黒背景 まとめのテキスト
+    Scene("text_black", 2.3, text="すべて、完全個室。"),
+
+    # 10. 生け花 ブリッジ
     Scene("bridge", 2.0, text="細やかな、おもてなし。",
           video="clideo_editor_e9c04e2420fe4c5fbf9ff8c0e9ab7f6a.mp4",
           video_logo_box=(400, 1185, 320, 85)),
 
-    # 7. ブランド露出 (黒背景)
-    Scene("brand_reveal", 3.0, text="心斎橋　禅園", sub="Shinsaibashi Zenen"),
+    # 11. ブランド露出
+    Scene("brand_reveal", 2.5, text="心斎橋　禅園", sub="Shinsaibashi Zenen"),
 
-    # 8. インフォカード (住所・電話・営業時間)
+    # 12. インフォカード
     Scene("info_card", 5.5),
 
-    # 9. CTA (プロフィール誘導)
-    Scene("cta_final", 3.0, text="詳しくは、プロフィールへ。"),
+    # 13. CTA
+    Scene("cta_final", 2.5, text="詳しくは、プロフィールへ。"),
 ]
 
 
@@ -129,15 +149,18 @@ def find_ffmpeg() -> str:
 
 
 def find_font() -> tuple[str, str]:
+    """明朝体を優先して検出する。"""
     candidates = [
+        ("/usr/share/fonts/opentype/ipaexfont-mincho/ipaexm.ttf", "IPAexMincho"),
+        ("/usr/share/fonts/opentype/ipafont-mincho/ipam.ttf", "IPAMincho"),
+        ("/usr/share/fonts/truetype/fonts-japanese-mincho.ttf", "IPAexMincho"),
         ("/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf", "IPAGothic"),
         ("/usr/share/fonts/truetype/fonts-japanese-gothic.ttf", "IPAGothic"),
-        ("/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc", "Noto Sans CJK JP"),
     ]
     for path, name in candidates:
         if Path(path).exists():
             return path, name
-    sys.exit("ERROR: Japanese font not found. Install fonts-ipafont-gothic.")
+    sys.exit("ERROR: Japanese font not found. Install fonts-ipaexfont-mincho.")
 
 
 def hex_to_ass_color(hex_rgb: str) -> str:
@@ -175,31 +198,31 @@ def build_scene_ass(scene: Scene, font_name: str) -> str:
     end = ass_ts(dur)
     end_ms = int(round(dur * 1000))
 
-    # スタイル定義 (name, size, color, bold, alignment, marginV)
+    # スタイル定義 (name, size, color, bold, alignment, marginV, outline)
+    # 洗練されたエディトリアル感を出すために全体的に小さめのサイズに。
     styles = [
-        ("TextBlack",   140, hex_to_ass_color(CREAM),   0, 5, 0),
-        ("Intro",        88, hex_to_ass_color(CREAM),  -1, 2, 320),
-        ("Tag",          54, hex_to_ass_color(CREAM),  -1, 1, 200),
-        ("TagSub",       38, hex_to_ass_color(GOLD),    0, 1, 140),
-        ("Brand",        30, hex_to_ass_color(CREAM),   0, 8, 160),
-        ("BrandBig",    160, hex_to_ass_color(CREAM),  -1, 5, 0),
-        ("BrandEn",      46, hex_to_ass_color(GOLD),    0, 5, 0),
-        ("BridgeText",   84, hex_to_ass_color(CREAM),  -1, 5, 0),
-        ("InfoName",    100, hex_to_ass_color(CREAM),  -1, 5, 0),
-        ("InfoEn",       36, hex_to_ass_color(GOLD),    0, 5, 0),
-        ("InfoAddr",     42, hex_to_ass_color(WHITE),   0, 5, 0),
-        ("InfoTel",      54, hex_to_ass_color(CREAM),  -1, 5, 0),
-        ("InfoHours",    42, hex_to_ass_color(WHITE),   0, 5, 0),
-        ("InfoClosed",   36, hex_to_ass_color(SUB_GRAY),0, 5, 0),
-        ("InfoHint",     34, hex_to_ass_color(CREAM),   0, 2, 120),
-        ("Cta",         100, hex_to_ass_color(CREAM),  -1, 5, 0),
-        ("Overlay",      10, "&H00000000",              0, 7, 0),
+        ("TextBlack",    62, hex_to_ass_color(CREAM),    0, 5,   0, 0),
+        ("Tag",          38, hex_to_ass_color(CREAM),    0, 7,   0, 2),
+        ("TagSub",       26, hex_to_ass_color(GOLD),     0, 7,   0, 2),
+        ("Brand",        22, hex_to_ass_color(CREAM),    0, 8, 120, 2),
+        ("BrandBig",     84, hex_to_ass_color(CREAM),    0, 5,   0, 0),
+        ("BrandEn",      28, hex_to_ass_color(GOLD),     0, 5,   0, 0),
+        ("BridgeText",   48, hex_to_ass_color(CREAM),    0, 5,   0, 2),
+        ("InfoName",     58, hex_to_ass_color(CREAM),    0, 5,   0, 0),
+        ("InfoEn",       24, hex_to_ass_color(GOLD),     0, 5,   0, 0),
+        ("InfoAddr",     30, hex_to_ass_color(WHITE),    0, 5,   0, 0),
+        ("InfoTel",      38, hex_to_ass_color(CREAM),    0, 5,   0, 0),
+        ("InfoHours",    30, hex_to_ass_color(WHITE),    0, 5,   0, 0),
+        ("InfoClosed",   26, hex_to_ass_color(SUB_GRAY), 0, 5,   0, 0),
+        ("InfoHint",     26, hex_to_ass_color(CREAM),    0, 2, 120, 0),
+        ("Cta",          58, hex_to_ass_color(CREAM),    0, 5,   0, 0),
+        ("Overlay",      10, "&H00000000",               0, 7,   0, 0),
     ]
     style_lines = [
         f"Style: {name},{font_name},{size},{color},&H000000FF,"
-        f"&H00000000,&H64000000,{bold},0,0,0,100,100,0,0,1,0,0,"
+        f"&H00000000,&H64000000,{bold},0,0,0,100,100,0,0,1,{outline},0,"
         f"{align},40,40,{marginv},1"
-        for (name, size, color, bold, align, marginv) in styles
+        for (name, size, color, bold, align, marginv, outline) in styles
     ]
 
     events: list[str] = []
@@ -237,65 +260,48 @@ def build_scene_ass(scene: Scene, font_name: str) -> str:
     # ---------- kind 別のイベント生成 ----------
 
     if scene.kind == "text_black":
-        fs = auto_slam_fs(scene.text, base=140)
+        fs = auto_slam_fs(scene.text, base=62)
+        # 上に細い金線、下にメインテキスト、ゆっくりフェード
+        events.append(
+            f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
+            r"{\an5\pos(540,900)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
+            r"\1a&H20&\fad(700,500)}m 0 0 l 80 0 l 80 2 l 0 2{\p0}"
+        )
         events.append(dialogue(
             "TextBlack",
-            r"{\an5\pos(540,960)\fs" + str(fs) +
-            r"\fad(800,600)}" + scene.text
+            r"{\an5\pos(540,980)\fs" + str(fs) +
+            r"\fsp6\fad(900,600)}" + scene.text
         ))
-        # 金の細い水平線 (下に少し離して置く)
-        events.append(
-            f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
-            r"{\an5\pos(540,1100)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
-            r"\1a&H30&\fad(900,500)}m 0 0 l 150 0 l 150 3 l 0 3{\p0}"
-        )
-
-    elif scene.kind == "photo_intro":
-        # 陽明のワイドに、1秒後からテキストがそっと立ち上がる
-        # 上部のブランドも遅れて入る
-        events.append(dialogue(
-            "Brand",
-            r"{" + stagger_fade(600, rise_ms=900) + r"}" + BRAND
-        ))
-        # 中央テキスト
-        events.append(dialogue(
-            "Intro",
-            r"{\an2\pos(540,1600)" + stagger_fade(1000, rise_ms=1000) +
-            r"}" + scene.text
-        ))
-        # 下部金線
-        events.append(
-            f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
-            r"{\an2\pos(540,1660)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
-            r"\1a&H30&" + stagger_fade(1200, rise_ms=900) + r"}"
-            "m 0 0 l 180 0 l 180 3 l 0 3{\\p0}"
-        )
 
     elif scene.kind == "photo_tag":
-        # 実写 + 左下に控えめなタグ (番号なし)
-        # 下部に半透明の薄い暗幕 (高さ 260)
-        events.append(rect("&H90&", 0, HEIGHT - 280, WIDTH, 280))
-        # ブランド (右上、小さく)
+        # エディトリアル風: 明朝の小さめテキストを左下に添える
+        # 薄いダーク帯 (120px) で軽く下地を作り、アウトラインで可読性を担保
+        events.append(rect("&HA8&", 0, HEIGHT - 160, WIDTH, 160))
+        # 右上ブランドマーク
         events.append(dialogue(
             "Brand",
-            r"{\fad(900,600)}" + BRAND
+            r"{\fad(1100,600)\fsp4}" + BRAND
         ))
-        # 左の縦細金線 (装飾)
+        # 左下 - 縦の細い金線
         events.append(
             f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
-            r"{\an7\pos(80,1700)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
-            r"\1a&H20&\fad(900,600)}m 0 0 l 3 0 l 3 120 l 0 120{\p0}"
+            r"{\an7\pos(80,1780)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
+            r"\1a&H10&\fad(900,600)}m 0 0 l 2 0 l 2 80 l 0 80{\p0}"
         )
-        # ルーム名 (縦線の右)
+        # ルーム名 (金線の右)
         events.append(dialogue(
             "Tag",
-            r"{\fad(900,600)\pos(130,1715)}" + scene.text
+            r"{\fad(900,600)\pos(110,1788)\fsp2}" + scene.text
         ))
         # キャパシティ
         events.append(dialogue(
             "TagSub",
-            r"{\fad(1100,600)\pos(130,1795)}" + scene.sub
+            r"{\fad(1100,600)\pos(110,1838)\fsp4}" + scene.sub
         ))
+
+    elif scene.kind == "photo":
+        # クリーン: テキスト無し
+        pass
 
     elif scene.kind == "bridge":
         # 生け花動画 + 下帯暗幕 + 中央テキスト
@@ -305,45 +311,44 @@ def build_scene_ass(scene: Scene, font_name: str) -> str:
         events.append(rect("&H00&", 0, HEIGHT - 500, WIDTH, 500))
         events.append(dialogue(
             "BridgeText",
-            r"{\an5\pos(540,1650)\fad(700,500)}" + scene.text
+            r"{\an5\pos(540,1650)\fsp4\fad(700,500)}" + scene.text
         ))
 
     elif scene.kind == "brand_reveal":
-        # 大きなブランド名 (JP) + 英語 + 下の金線
+        # 小さめの店名 + 金線 + 英語。広い余白で editorial な佇まい
         events.append(dialogue(
             "BrandBig",
-            r"{\an5\pos(540,900)\fad(900,600)}" + scene.text
+            r"{\an5\pos(540,910)\fsp10\fad(900,600)}" + scene.text
         ))
         events.append(
             f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
-            r"{\an5\pos(540,1020)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
-            r"\1a&H20&\fad(1100,600)}m 0 0 l 140 0 l 140 3 l 0 3{\p0}"
+            r"{\an5\pos(540,980)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
+            r"\1a&H20&\fad(1100,600)}m 0 0 l 90 0 l 90 2 l 0 2{\p0}"
         )
         events.append(dialogue(
             "BrandEn",
-            r"{\an5\pos(540,1080)\fad(1200,500)}" + scene.sub
+            r"{\an5\pos(540,1020)\fsp6\fad(1200,500)}" + scene.sub
         ))
 
     elif scene.kind == "info_card":
         # 店舗情報。スタッガード・フェードで順番に立ち上げる
-        fade_out_end_ms = end_ms
         fade_out_start_ms = end_ms - 500
+        # (style, y, text, delay_ms, letter_spacing)
         lines = [
-            # (style, y, text, delay_ms)
-            ("InfoName",   460, STORE_INFO["name_jp"],  200),
-            ("InfoEn",     580, STORE_INFO["name_en"],  400),
-            ("InfoAddr",   760, STORE_INFO["postal"],   700),
-            ("InfoAddr",   820, STORE_INFO["addr1"],    800),
-            ("InfoAddr",   880, STORE_INFO["addr2"],    900),
-            ("InfoTel",   1020, STORE_INFO["tel"],     1150),
-            ("InfoHours", 1170, STORE_INFO["lunch"],   1400),
-            ("InfoHours", 1230, STORE_INFO["dinner"],  1500),
-            ("InfoClosed",1370, STORE_INFO["closed"],  1700),
+            ("InfoName",   580, STORE_INFO["name_jp"], 200,  8),
+            ("InfoEn",     680, STORE_INFO["name_en"], 400,  6),
+            ("InfoAddr",   830, STORE_INFO["postal"],  700,  2),
+            ("InfoAddr",   880, STORE_INFO["addr1"],   800,  2),
+            ("InfoAddr",   930, STORE_INFO["addr2"],   900,  2),
+            ("InfoTel",   1050, STORE_INFO["tel"],    1150,  4),
+            ("InfoHours", 1180, STORE_INFO["lunch"],  1400,  2),
+            ("InfoHours", 1225, STORE_INFO["dinner"], 1500,  2),
+            ("InfoClosed",1340, STORE_INFO["closed"], 1700,  2),
         ]
-        for style_name, y, text, delay in lines:
+        for style_name, y, text, delay, fsp in lines:
             events.append(dialogue(
                 style_name,
-                f"{{\\an5\\pos(540,{y})"
+                f"{{\\an5\\pos(540,{y})\\fsp{fsp}"
                 + stagger_fade(delay, rise_ms=600,
                                hold_to_ms=fade_out_start_ms,
                                fade_out_ms=500)
@@ -352,37 +357,37 @@ def build_scene_ass(scene: Scene, font_name: str) -> str:
         # 店名下の金線
         events.append(
             f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
-            r"{\an5\pos(540,660)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
-            r"\1a&H30&" + stagger_fade(500, rise_ms=600,
+            r"{\an5\pos(540,735)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
+            r"\1a&H20&" + stagger_fade(500, rise_ms=600,
                                        hold_to_ms=fade_out_start_ms,
                                        fade_out_ms=500) + r"}"
-            "m 0 0 l 120 0 l 120 3 l 0 3{\\p0}"
+            "m 0 0 l 80 0 l 80 2 l 0 2{\\p0}"
         )
         # 下部誘導
         events.append(dialogue(
             "InfoHint",
-            r"{" + stagger_fade(2000, rise_ms=800,
-                                hold_to_ms=fade_out_start_ms,
-                                fade_out_ms=500) + r"}" + STORE_INFO["cta_hint"]
+            r"{\fsp4" + stagger_fade(2000, rise_ms=800,
+                                     hold_to_ms=fade_out_start_ms,
+                                     fade_out_ms=500) + r"}" + STORE_INFO["cta_hint"]
         ))
 
     elif scene.kind == "cta_final":
-        fs = auto_slam_fs(scene.text, base=88)
+        fs = auto_slam_fs(scene.text, base=58)
         events.append(dialogue(
             "Cta",
-            r"{\an5\pos(540,880)\fs" + str(fs) +
-            r"\fad(900,500)}" + scene.text
+            r"{\an5\pos(540,920)\fs" + str(fs) +
+            r"\fsp6\fad(900,500)}" + scene.text
         ))
         # 装飾金線
         events.append(
             f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
-            r"{\an5\pos(540,980)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
-            r"\1a&H20&\fad(1100,500)}m 0 0 l 150 0 l 150 3 l 0 3{\p0}"
+            r"{\an5\pos(540,990)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
+            r"\1a&H20&\fad(1100,500)}m 0 0 l 90 0 l 90 2 l 0 2{\p0}"
         )
         # ブランドを下に小さく
         events.append(dialogue(
             "Brand",
-            r"{\an5\pos(540,1060)\fad(1300,500)}" + BRAND
+            r"{\an5\pos(540,1040)\fsp4\fad(1300,500)}" + BRAND
         ))
 
     header = f"""[Script Info]
