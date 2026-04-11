@@ -75,6 +75,8 @@ python3 scripts/generate_reel.py --out output/draft.mp4
 | コーデック | H.264 High / yuv420p / faststart (CRF 19) |
 | カメラワーク | ごく控えめな Ken Burns 1.00〜1.08、in/out 交互 |
 | フェード | 0.35 秒（前後） |
+| BGM | `Midnight_Bamboo_Drive.mp3` (30.77s, 音量 0.55) |
+| BGM フェード | イン 1.5 秒 / アウト 1.8 秒、残 3.6 秒は無音 |
 
 ### 構成（13 カット）
 

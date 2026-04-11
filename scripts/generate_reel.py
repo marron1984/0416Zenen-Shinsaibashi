@@ -41,6 +41,12 @@ SUB_GRAY = "#a8a090"
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BRAND = "Shinsaibashi  Zenen"
 
+# BGM (リポジトリ直下に配置)。見つからなければ無音のまま
+BGM_FILE = "Midnight_Bamboo_Drive.mp3"
+BGM_VOLUME = 0.55       # 0.0–1.0 (マスター音量)
+BGM_FADE_IN_SEC = 1.5
+BGM_FADE_OUT_SEC = 1.8
+
 # 店舗情報 (info_card シーンで表示)
 STORE_INFO = {
     "name_jp":   "心斎橋　禅園",
@@ -516,6 +522,54 @@ def concat(ffmpeg: str, files: list[Path], out: Path) -> None:
         os.unlink(list_path)
 
 
+def mux_bgm(ffmpeg: str, src_video: Path, bgm: Path, out: Path,
+            total_duration: float) -> None:
+    """src_video の映像に bgm をミックスして out に書き出す。
+
+    - 動画側の無音トラックは捨てて BGM だけを使う
+    - BGM が動画より短い場合は 1 度だけ再生して自然に終わらせる
+    - BGM 冒頭と末尾でフェード
+    """
+    # 動画より BGM が短い場合、BGM 再生後は無音で動画尺まで埋める
+    # (ループは loop point で音が飛ぶので使わない)
+    bgm_dur = get_audio_duration(ffmpeg, bgm)
+    play_end = min(total_duration, bgm_dur)
+    fade_out_start = max(0.0, play_end - BGM_FADE_OUT_SEC)
+    af = (
+        f"volume={BGM_VOLUME},"
+        f"afade=t=in:st=0:d={BGM_FADE_IN_SEC},"
+        f"afade=t=out:st={fade_out_start:.3f}:d={BGM_FADE_OUT_SEC},"
+        f"apad=whole_dur={total_duration:.3f}"
+    )
+    cmd = [
+        ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
+        "-i", str(src_video),
+        "-i", str(bgm),
+        "-filter_complex", f"[1:a]{af}[a]",
+        "-map", "0:v:0", "-map", "[a]",
+        "-c:v", "copy",
+        "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
+        "-t", f"{total_duration:.3f}",
+        "-movflags", "+faststart",
+        str(out),
+    ]
+    subprocess.run(cmd, check=True)
+
+
+def get_audio_duration(ffmpeg: str, path: Path) -> float:
+    """ffmpeg で音声の尺を秒で取得。"""
+    r = subprocess.run(
+        [ffmpeg, "-hide_banner", "-i", str(path)],
+        capture_output=True, text=True,
+    )
+    import re
+    m = re.search(r"Duration:\s*(\d+):(\d+):([\d.]+)", r.stderr)
+    if not m:
+        return 0.0
+    h, mm, ss = m.groups()
+    return int(h) * 3600 + int(mm) * 60 + float(ss)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     default_out = REPO_ROOT / "output" / "reel_w3_hikakukentou2.mp4"
@@ -552,7 +606,16 @@ def main() -> int:
             running += scene.duration
 
         print("concatenating...")
-        concat(ffmpeg, scene_files, args.out)
+        silent_out = tmp_path / "silent.mp4"
+        concat(ffmpeg, scene_files, silent_out)
+
+        bgm_path = REPO_ROOT / BGM_FILE
+        if bgm_path.exists():
+            print(f"muxing BGM: {BGM_FILE}")
+            mux_bgm(ffmpeg, silent_out, bgm_path, args.out, running)
+        else:
+            print(f"no BGM found at {bgm_path}, leaving silent")
+            shutil.copy(silent_out, args.out)
 
     size = args.out.stat().st_size
     print(f"done: {args.out} ({size / 1024:.1f} KB, {running:.1f}s)")
