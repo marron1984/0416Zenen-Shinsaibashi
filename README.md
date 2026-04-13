@@ -53,11 +53,11 @@ python3 scripts/generate_reel.py
 python3 scripts/generate_reel.py --out output/draft.mp4
 ```
 
-## 第3週：比較検討② — v7 動画仕様
+## 第3週：比較検討② — v8 動画仕様
 
-**コンセプト**: エディトリアル明朝 / 全カット写真背景。黒背景も生け花ブリッジも
-排除し、すべてのテキストを実写の上に重ねる構成。写真はダーケン+ガウシアンブラー
-で沈めて可読性を担保しつつ、お部屋の雰囲気は残す。
+**コンセプト**: エディトリアル明朝 / 全カット写真背景 / 音楽に合わせた
+ゆったりとした展開。BGM は `Silver_Water_Under_Stone.mp3`。尺を 30.5 秒
+まで延ばして BGM の 30.77 秒とほぼ完全に同期。
 
 | 項目 | 値 |
 |---|---|
@@ -66,33 +66,33 @@ python3 scripts/generate_reel.py --out output/draft.mp4
 | ターゲット | 30〜50代経営者の接待、40代以上の会食 |
 | 最重要価値 | 失敗しない安心感 |
 | 解像度 | 1080×1920 (9:16) |
-| 尺 | 28.0 秒 |
-| カット数 | **7 カット（全カット実写背景）** |
-| 平均カット長 | 4.0 秒 |
-| フォント | **IPAex明朝 (IPAexMincho)** |
+| 尺 | **30.5 秒**（BGM 尺 30.77 秒に同期） |
+| カット数 | 7 カット（全カット実写背景） |
+| 平均カット長 | 約 4.4 秒（v7 から +0.4 秒） |
+| フォント | IPAex明朝 (IPAexMincho) |
 | 文字サイズ | 22〜84pt（editorial 寄りの小さめ） |
 | レタースペーシング | `\fsp` 2〜10 で広め |
 | フレームレート | 30fps |
 | コーデック | H.264 High / yuv420p / faststart (CRF 19) |
-| カメラワーク | ごく控えめな Ken Burns 1.00〜1.08、in/out 交互 |
+| カメラワーク | **Ken Burns 1.00〜1.06**（v7 から緩和） |
 | テキスト背景 | eq brightness -0.22〜-0.38 + gblur sigma 5〜12 |
-| フェード | 0.35 秒（前後） |
-| BGM | `Midnight_Bamboo_Drive.mp3` (30.77s, 音量 0.55) |
-| BGM フェード | イン 1.5 秒 / アウト 1.8 秒 |
+| フェード | **0.50 秒**（v7 から +0.15 秒）、クロスフェード風 |
+| BGM | **`Silver_Water_Under_Stone.mp3`** (30.77s, 音量 0.55) |
+| BGM フェード | イン 2.0 秒 / アウト 2.2 秒 |
 
 ### 構成（7 カット / 全て写真背景）
 
 | # | 時刻 | 尺 | Kind | 写真 | テキスト |
 |---|---|---|---|---|---|
-| 1 | 0.0– 4.0 | 4.0s | photo_tag   | 陽明 Youmei.JPG | タグ「陽明  Youmei / 2〜6名様」 |
-| 2 | 4.0– 8.0 | 4.0s | photo_tag   | 日月 Nichigetsu01 | タグ「日月  Nichigetsu / 2〜6名様」 |
-| 3 | 8.0–12.0 | 4.0s | photo_tag   | 梨山 rizan01 | タグ「梨山  rizan / 7〜10名様」 |
-| 4 | 12.0–15.2 | 3.2s | photo_text  | 日月 Nichigetsu02 (暗化+blur) | 「すべて、完全個室。」 |
-| 5 | 15.2–18.5 | 3.3s | photo_brand | 梨山 rizan02 (暗化+blur) | 「心斎橋　禅園 / Shinsaibashi Zenen」 |
-| 6 | 18.5–25.0 | 6.5s | photo_info  | 日月 Nichigetsu03 (濃暗化+強blur) | 店舗情報フルセット |
-| 7 | 25.0–28.0 | 3.0s | photo_cta   | 梨山 rizan03 (暗化+blur) | 「詳しくは、プロフィールへ。」 |
+| 1 | 0.0– 4.5 | 4.5s | photo_tag   | 陽明 Youmei.JPG | タグ「陽明  Youmei / 2〜6名様」 |
+| 2 | 4.5– 9.0 | 4.5s | photo_tag   | 日月 Nichigetsu01 | タグ「日月  Nichigetsu / 2〜6名様」 |
+| 3 | 9.0–13.5 | 4.5s | photo_tag   | 梨山 rizan01 | タグ「梨山  rizan / 7〜10名様」 |
+| 4 | 13.5–17.0 | 3.5s | photo_text  | 日月 Nichigetsu02 (暗化+blur) | 「すべて、完全個室。」 |
+| 5 | 17.0–20.5 | 3.5s | photo_brand | 梨山 rizan02 (暗化+blur) | 「心斎橋　禅園 / Shinsaibashi Zenen」 |
+| 6 | 20.5–27.5 | 7.0s | photo_info  | 日月 Nichigetsu03 (濃暗化+強blur) | 店舗情報フルセット |
+| 7 | 27.5–30.5 | 3.0s | photo_cta   | 梨山 rizan03 (暗化+blur) | 「詳しくは、プロフィールへ。」 |
 
-全 7 枚の実写を使い切る構成。生け花クリップ (scene 10) は削除済み。
+全 7 枚の実写を使い切る構成。
 
 ### 店舗情報カード (info_card)
 

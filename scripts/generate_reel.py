@@ -42,10 +42,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 BRAND = "Shinsaibashi  Zenen"
 
 # BGM (リポジトリ直下に配置)。見つからなければ無音のまま
-BGM_FILE = "Midnight_Bamboo_Drive.mp3"
+BGM_FILE = "Silver_Water_Under_Stone.mp3"
 BGM_VOLUME = 0.55       # 0.0–1.0 (マスター音量)
-BGM_FADE_IN_SEC = 1.5
-BGM_FADE_OUT_SEC = 1.8
+BGM_FADE_IN_SEC = 2.0
+BGM_FADE_OUT_SEC = 2.2
 
 # 店舗情報 (info_card シーンで表示)
 STORE_INFO = {
@@ -86,42 +86,42 @@ class Scene:
 
 SCENES: list[Scene] = [
     # 1. 陽明 + タグ
-    Scene("photo_tag", 4.0, text="陽明  Youmei", sub="2〜6名様",
+    Scene("photo_tag", 4.5, text="陽明  Youmei", sub="2〜6名様",
           image="陽明 Youmei.JPG", crop_x_pct=0.5,
-          zoom_start=1.00, zoom_end=1.08),
+          zoom_start=1.00, zoom_end=1.06),
 
     # 2. 日月 + タグ
-    Scene("photo_tag", 4.0, text="日月  Nichigetsu", sub="2〜6名様",
+    Scene("photo_tag", 4.5, text="日月  Nichigetsu", sub="2〜6名様",
           image=" 日月 Nichigetsu01 .JPG", crop_x_pct=0.5,
-          zoom_start=1.00, zoom_end=1.08),
+          zoom_start=1.00, zoom_end=1.06),
 
     # 3. 梨山 + タグ (茶器)
-    Scene("photo_tag", 4.0, text="梨山  rizan", sub="7〜10名様",
+    Scene("photo_tag", 4.5, text="梨山  rizan", sub="7〜10名様",
           image="梨山 rizan01.JPG", crop_x_pct=0.45,
-          zoom_start=1.00, zoom_end=1.08),
+          zoom_start=1.00, zoom_end=1.06),
 
     # 4. 写真の上にテキスト「すべて、完全個室。」
-    Scene("photo_text", 3.2, text="すべて、完全個室。",
+    Scene("photo_text", 3.5, text="すべて、完全個室。",
           image=" 日月 Nichigetsu02.JPG", crop_x_pct=0.5,
-          zoom_start=1.08, zoom_end=1.00,
+          zoom_start=1.06, zoom_end=1.00,
           bg_darken=0.22, bg_blur=5),
 
     # 5. 写真の上にブランド「心斎橋 禅園 / Shinsaibashi Zenen」
-    Scene("photo_brand", 3.3, text="心斎橋　禅園", sub="Shinsaibashi Zenen",
+    Scene("photo_brand", 3.5, text="心斎橋　禅園", sub="Shinsaibashi Zenen",
           image="梨山 rizan02.JPG", crop_x_pct=0.5,
-          zoom_start=1.05, zoom_end=1.00,
+          zoom_start=1.04, zoom_end=1.00,
           bg_darken=0.24, bg_blur=5),
 
     # 6. 写真の上に店舗情報カード
-    Scene("photo_info", 6.5,
+    Scene("photo_info", 7.0,
           image=" 日月 Nichigetsu03 .JPG", crop_x_pct=0.5,
-          zoom_start=1.00, zoom_end=1.04,
+          zoom_start=1.00, zoom_end=1.03,
           bg_darken=0.38, bg_blur=12),
 
     # 7. 写真の上に CTA「詳しくは、プロフィールへ。」
     Scene("photo_cta", 3.0, text="詳しくは、プロフィールへ。",
           image="梨山 rizan03.JPG", crop_x_pct=0.5,
-          zoom_start=1.05, zoom_end=1.00,
+          zoom_start=1.04, zoom_end=1.00,
           bg_darken=0.24, bg_blur=5),
 ]
 
@@ -433,8 +433,8 @@ def render_scene(ffmpeg: str, scene: Scene, ass_path: Path, out_path: Path) -> N
     cmd += ["-f", "lavfi", "-i",
             "anullsrc=channel_layout=stereo:sample_rate=48000"]
 
-    # 長めのフェードで繋ぎをなめらかに
-    fade_t = 0.35
+    # 長めのフェードで繋ぎをなめらかに (ゆったりとした展開)
+    fade_t = 0.50
     fade_out_st = max(0.0, scene.duration - fade_t)
     vf_full = (
         f"{vf},"
