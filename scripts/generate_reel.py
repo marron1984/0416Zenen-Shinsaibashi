@@ -95,9 +95,9 @@ SCENES: list[Scene] = [
           image=" 日月 Nichigetsu01 .JPG", crop_x_pct=0.5,
           zoom_start=1.00, zoom_end=1.06),
 
-    # 3. 梨山 + タグ (茶器)
+    # 3. 梨山 + タグ
     Scene("photo_tag", 4.5, text="梨山  rizan", sub="7〜10名様",
-          image="梨山 rizan01.JPG", crop_x_pct=0.45,
+          image="梨山 rizan02.JPG", crop_x_pct=0.5,
           zoom_start=1.00, zoom_end=1.06),
 
     # 4. 写真の上にテキスト「すべて、完全個室。」
@@ -106,9 +106,9 @@ SCENES: list[Scene] = [
           zoom_start=1.06, zoom_end=1.00,
           bg_darken=0.22, bg_blur=5),
 
-    # 5. 写真の上にブランド「心斎橋 禅園 / Shinsaibashi Zenen」
+    # 5. 写真の上にブランド「心斎橋 禅園 / Shinsaibashi Zenen」 (茶器背景)
     Scene("photo_brand", 3.5, text="心斎橋　禅園", sub="Shinsaibashi Zenen",
-          image="梨山 rizan02.JPG", crop_x_pct=0.5,
+          image="梨山 rizan01.JPG", crop_x_pct=0.45,
           zoom_start=1.04, zoom_end=1.00,
           bg_darken=0.24, bg_blur=5),
 
@@ -191,23 +191,23 @@ def build_scene_ass(scene: Scene, font_name: str) -> str:
     end_ms = int(round(dur * 1000))
 
     # スタイル定義 (name, size, color, bold, alignment, marginV, outline)
-    # 洗練されたエディトリアル感を出すために全体的に小さめのサイズに。
+    # v9: テロップを読ませるために全体的に文字を大きく。
     styles = [
-        ("TextBlack",    62, hex_to_ass_color(CREAM),    0, 5,   0, 0),
-        ("Tag",          38, hex_to_ass_color(CREAM),    0, 7,   0, 2),
-        ("TagSub",       26, hex_to_ass_color(GOLD),     0, 7,   0, 2),
-        ("Brand",        22, hex_to_ass_color(CREAM),    0, 8, 120, 2),
-        ("BrandBig",     84, hex_to_ass_color(CREAM),    0, 5,   0, 0),
-        ("BrandEn",      28, hex_to_ass_color(GOLD),     0, 5,   0, 0),
-        ("BridgeText",   48, hex_to_ass_color(CREAM),    0, 5,   0, 2),
-        ("InfoName",     58, hex_to_ass_color(CREAM),    0, 5,   0, 0),
-        ("InfoEn",       24, hex_to_ass_color(GOLD),     0, 5,   0, 0),
-        ("InfoAddr",     30, hex_to_ass_color(WHITE),    0, 5,   0, 0),
-        ("InfoTel",      38, hex_to_ass_color(CREAM),    0, 5,   0, 0),
-        ("InfoHours",    30, hex_to_ass_color(WHITE),    0, 5,   0, 0),
-        ("InfoClosed",   26, hex_to_ass_color(SUB_GRAY), 0, 5,   0, 0),
-        ("InfoHint",     26, hex_to_ass_color(CREAM),    0, 2, 120, 0),
-        ("Cta",          58, hex_to_ass_color(CREAM),    0, 5,   0, 0),
+        ("TextBlack",    82, hex_to_ass_color(CREAM),    0, 5,   0, 0),
+        ("Tag",          52, hex_to_ass_color(CREAM),    0, 7,   0, 2),
+        ("TagSub",       34, hex_to_ass_color(GOLD),     0, 7,   0, 2),
+        ("Brand",        28, hex_to_ass_color(CREAM),    0, 8, 120, 2),
+        ("BrandBig",    108, hex_to_ass_color(CREAM),    0, 5,   0, 0),
+        ("BrandEn",      36, hex_to_ass_color(GOLD),     0, 5,   0, 0),
+        ("BridgeText",   60, hex_to_ass_color(CREAM),    0, 5,   0, 2),
+        ("InfoName",     74, hex_to_ass_color(CREAM),    0, 5,   0, 0),
+        ("InfoEn",       30, hex_to_ass_color(GOLD),     0, 5,   0, 0),
+        ("InfoAddr",     38, hex_to_ass_color(WHITE),    0, 5,   0, 0),
+        ("InfoTel",      48, hex_to_ass_color(CREAM),    0, 5,   0, 0),
+        ("InfoHours",    38, hex_to_ass_color(WHITE),    0, 5,   0, 0),
+        ("InfoClosed",   32, hex_to_ass_color(SUB_GRAY), 0, 5,   0, 0),
+        ("InfoHint",     32, hex_to_ass_color(CREAM),    0, 2, 120, 0),
+        ("Cta",          76, hex_to_ass_color(CREAM),    0, 5,   0, 0),
         ("Overlay",      10, "&H00000000",               0, 7,   0, 0),
     ]
     style_lines = [
@@ -252,8 +252,9 @@ def build_scene_ass(scene: Scene, font_name: str) -> str:
     # ---------- kind 別のイベント生成 ----------
 
     if scene.kind == "photo_tag":
-        # エディトリアル風: 明朝の小さめテキストを左下に添える
-        events.append(rect("&HA8&", 0, HEIGHT - 160, WIDTH, 160))
+        # エディトリアル風: 明朝テキストを左下に添える
+        # テロップを大きくしたのに合わせて下部暗幕も 160→220 に拡大
+        events.append(rect("&HA8&", 0, HEIGHT - 220, WIDTH, 220))
         events.append(dialogue(
             "Brand",
             r"{\fad(1100,600)\fsp4}" + BRAND
@@ -261,25 +262,25 @@ def build_scene_ass(scene: Scene, font_name: str) -> str:
         # 左下 - 縦の細い金線
         events.append(
             f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
-            r"{\an7\pos(80,1780)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
-            r"\1a&H10&\fad(900,600)}m 0 0 l 2 0 l 2 80 l 0 80{\p0}"
+            r"{\an7\pos(80,1740)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
+            r"\1a&H10&\fad(900,600)}m 0 0 l 2 0 l 2 130 l 0 130{\p0}"
         )
         events.append(dialogue(
             "Tag",
-            r"{\fad(900,600)\pos(110,1788)\fsp2}" + scene.text
+            r"{\fad(900,600)\pos(115,1748)\fsp2}" + scene.text
         ))
         events.append(dialogue(
             "TagSub",
-            r"{\fad(1100,600)\pos(110,1838)\fsp4}" + scene.sub
+            r"{\fad(1100,600)\pos(115,1818)\fsp4}" + scene.sub
         ))
 
     elif scene.kind == "photo_text":
         # 暗くぼかした写真の上に中央のテキスト
-        fs = auto_slam_fs(scene.text, base=68)
+        fs = auto_slam_fs(scene.text, base=90)
         events.append(
             f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
-            r"{\an5\pos(540,900)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
-            r"\1a&H20&\fad(700,500)}m 0 0 l 80 0 l 80 2 l 0 2{\p0}"
+            r"{\an5\pos(540,880)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
+            r"\1a&H20&\fad(700,500)}m 0 0 l 100 0 l 100 3 l 0 3{\p0}"
         )
         events.append(dialogue(
             "TextBlack",
@@ -291,31 +292,32 @@ def build_scene_ass(scene: Scene, font_name: str) -> str:
         # 暗くぼかした写真の上にブランド店名 + 英語
         events.append(dialogue(
             "BrandBig",
-            r"{\an5\pos(540,910)\fsp10\fad(900,600)}" + scene.text
+            r"{\an5\pos(540,900)\fsp12\fad(900,600)}" + scene.text
         ))
         events.append(
             f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
-            r"{\an5\pos(540,980)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
-            r"\1a&H20&\fad(1100,600)}m 0 0 l 90 0 l 90 2 l 0 2{\p0}"
+            r"{\an5\pos(540,990)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
+            r"\1a&H20&\fad(1100,600)}m 0 0 l 110 0 l 110 3 l 0 3{\p0}"
         )
         events.append(dialogue(
             "BrandEn",
-            r"{\an5\pos(540,1020)\fsp6\fad(1200,500)}" + scene.sub
+            r"{\an5\pos(540,1040)\fsp8\fad(1200,500)}" + scene.sub
         ))
 
     elif scene.kind == "photo_info":
         # 暗くぼかした写真の上に店舗情報をスタッガード・フェードで
+        # 文字を大きくしたので行間と全体のレイアウトを調整
         fade_out_start_ms = end_ms - 500
         lines = [
-            ("InfoName",   580, STORE_INFO["name_jp"], 200,  8),
-            ("InfoEn",     680, STORE_INFO["name_en"], 400,  6),
+            ("InfoName",   540, STORE_INFO["name_jp"], 200,  8),
+            ("InfoEn",     660, STORE_INFO["name_en"], 400,  6),
             ("InfoAddr",   830, STORE_INFO["postal"],  700,  2),
-            ("InfoAddr",   880, STORE_INFO["addr1"],   800,  2),
-            ("InfoAddr",   930, STORE_INFO["addr2"],   900,  2),
-            ("InfoTel",   1050, STORE_INFO["tel"],    1150,  4),
-            ("InfoHours", 1180, STORE_INFO["lunch"],  1400,  2),
-            ("InfoHours", 1225, STORE_INFO["dinner"], 1500,  2),
-            ("InfoClosed",1340, STORE_INFO["closed"], 1700,  2),
+            ("InfoAddr",   895, STORE_INFO["addr1"],   800,  2),
+            ("InfoAddr",   960, STORE_INFO["addr2"],   900,  2),
+            ("InfoTel",   1090, STORE_INFO["tel"],    1150,  4),
+            ("InfoHours", 1230, STORE_INFO["lunch"],  1400,  2),
+            ("InfoHours", 1290, STORE_INFO["dinner"], 1500,  2),
+            ("InfoClosed",1410, STORE_INFO["closed"], 1700,  2),
         ]
         for style_name, y, text, delay, fsp in lines:
             events.append(dialogue(
@@ -328,11 +330,11 @@ def build_scene_ass(scene: Scene, font_name: str) -> str:
             ))
         events.append(
             f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
-            r"{\an5\pos(540,735)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
+            r"{\an5\pos(540,720)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
             r"\1a&H20&" + stagger_fade(500, rise_ms=600,
                                        hold_to_ms=fade_out_start_ms,
                                        fade_out_ms=500) + r"}"
-            "m 0 0 l 80 0 l 80 2 l 0 2{\\p0}"
+            "m 0 0 l 100 0 l 100 3 l 0 3{\\p0}"
         )
         events.append(dialogue(
             "InfoHint",
@@ -343,20 +345,20 @@ def build_scene_ass(scene: Scene, font_name: str) -> str:
 
     elif scene.kind == "photo_cta":
         # 暗くぼかした写真の上に CTA テキスト + ブランド
-        fs = auto_slam_fs(scene.text, base=58)
+        fs = auto_slam_fs(scene.text, base=76)
         events.append(dialogue(
             "Cta",
-            r"{\an5\pos(540,920)\fs" + str(fs) +
+            r"{\an5\pos(540,910)\fs" + str(fs) +
             r"\fsp6\fad(900,500)}" + scene.text
         ))
         events.append(
             f"Dialogue: 0,{start},{end},Overlay,,0,0,0,,"
-            r"{\an5\pos(540,990)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
-            r"\1a&H20&\fad(1100,500)}m 0 0 l 90 0 l 90 2 l 0 2{\p0}"
+            r"{\an5\pos(540,1000)\p1\bord0\shad0\1c" + hex_to_ass_color(GOLD) +
+            r"\1a&H20&\fad(1100,500)}m 0 0 l 110 0 l 110 3 l 0 3{\p0}"
         )
         events.append(dialogue(
             "Brand",
-            r"{\an5\pos(540,1040)\fsp4\fad(1300,500)}" + BRAND
+            r"{\an5\pos(540,1060)\fsp4\fad(1300,500)}" + BRAND
         ))
 
     header = f"""[Script Info]

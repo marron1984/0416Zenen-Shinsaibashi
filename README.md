@@ -70,7 +70,7 @@ python3 scripts/generate_reel.py --out output/draft.mp4
 | カット数 | 7 カット（全カット実写背景） |
 | 平均カット長 | 約 4.4 秒（v7 から +0.4 秒） |
 | フォント | IPAex明朝 (IPAexMincho) |
-| 文字サイズ | 22〜84pt（editorial 寄りの小さめ） |
+| 文字サイズ | 28〜108pt（視認性重視で大きめ） |
 | レタースペーシング | `\fsp` 2〜10 で広め |
 | フレームレート | 30fps |
 | コーデック | H.264 High / yuv420p / faststart (CRF 19) |
@@ -86,9 +86,9 @@ python3 scripts/generate_reel.py --out output/draft.mp4
 |---|---|---|---|---|---|
 | 1 | 0.0– 4.5 | 4.5s | photo_tag   | 陽明 Youmei.JPG | タグ「陽明  Youmei / 2〜6名様」 |
 | 2 | 4.5– 9.0 | 4.5s | photo_tag   | 日月 Nichigetsu01 | タグ「日月  Nichigetsu / 2〜6名様」 |
-| 3 | 9.0–13.5 | 4.5s | photo_tag   | 梨山 rizan01 | タグ「梨山  rizan / 7〜10名様」 |
+| 3 | 9.0–13.5 | 4.5s | photo_tag   | 梨山 rizan02 | タグ「梨山  rizan / 7〜10名様」 |
 | 4 | 13.5–17.0 | 3.5s | photo_text  | 日月 Nichigetsu02 (暗化+blur) | 「すべて、完全個室。」 |
-| 5 | 17.0–20.5 | 3.5s | photo_brand | 梨山 rizan02 (暗化+blur) | 「心斎橋　禅園 / Shinsaibashi Zenen」 |
+| 5 | 17.0–20.5 | 3.5s | photo_brand | 梨山 rizan01 (茶器 / 暗化+blur) | 「心斎橋　禅園 / Shinsaibashi Zenen」 |
 | 6 | 20.5–27.5 | 7.0s | photo_info  | 日月 Nichigetsu03 (濃暗化+強blur) | 店舗情報フルセット |
 | 7 | 27.5–30.5 | 3.0s | photo_cta   | 梨山 rizan03 (暗化+blur) | 「詳しくは、プロフィールへ。」 |
 
