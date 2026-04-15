@@ -100,8 +100,8 @@ SCENES: list[Scene] = [
           image="梨山 rizan02.JPG", crop_x_pct=0.5,
           zoom_start=1.00, zoom_end=1.06),
 
-    # 4. 写真の上にテキスト「すべて、完全個室。」
-    Scene("photo_text", 3.5, text="すべて、完全個室。",
+    # 4. 写真の上にテキスト「さまざまな、ご会食に。」
+    Scene("photo_text", 3.5, text="さまざまな、ご会食に。",
           image=" 日月 Nichigetsu02.JPG", crop_x_pct=0.5,
           zoom_start=1.06, zoom_end=1.00,
           bg_darken=0.22, bg_blur=5),
@@ -336,12 +336,8 @@ def build_scene_ass(scene: Scene, font_name: str) -> str:
                                        fade_out_ms=500) + r"}"
             "m 0 0 l 100 0 l 100 3 l 0 3{\\p0}"
         )
-        events.append(dialogue(
-            "InfoHint",
-            r"{\fsp4" + stagger_fade(2000, rise_ms=800,
-                                     hold_to_ms=fade_out_start_ms,
-                                     fade_out_ms=500) + r"}" + STORE_INFO["cta_hint"]
-        ))
+        # 「詳しくは、プロフィールへ」は次のシーン (photo_cta) で大きく表示されるため
+        # ここでは省略
 
     elif scene.kind == "photo_cta":
         # 暗くぼかした写真の上に CTA テキスト + ブランド
