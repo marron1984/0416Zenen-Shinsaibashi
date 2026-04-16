@@ -86,40 +86,50 @@ class Scene:
 
 SCENES: list[Scene] = [
     # 1. 陽明 + タグ
-    Scene("photo_tag", 4.5, text="陽明  Youmei", sub="2〜6名様",
+    Scene("photo_tag", 4.0, text="陽明  Youmei", sub="2〜6名様",
           image="陽明 Youmei.JPG", crop_x_pct=0.5,
           zoom_start=1.00, zoom_end=1.06),
 
     # 2. 日月 + タグ
-    Scene("photo_tag", 4.5, text="日月  Nichigetsu", sub="2〜6名様",
+    Scene("photo_tag", 4.0, text="日月  Nichigetsu", sub="2〜6名様",
           image=" 日月 Nichigetsu01 .JPG", crop_x_pct=0.5,
           zoom_start=1.00, zoom_end=1.06),
 
     # 3. 梨山 + タグ
-    Scene("photo_tag", 4.5, text="梨山  rizan", sub="7〜10名様",
+    Scene("photo_tag", 4.0, text="梨山  rizan", sub="7〜10名様",
           image="梨山 rizan02.JPG", crop_x_pct=0.5,
           zoom_start=1.00, zoom_end=1.06),
 
-    # 4. 写真の上にテキスト「さまざまな、ご会食に。」
-    Scene("photo_text", 3.5, text="さまざまな、ご会食に。",
+    # 4. お酌シーン (クリーン)
+    Scene("photo", 3.0,
+          image="DSC00727修.jpg", crop_x_pct=0.5,
+          zoom_start=1.00, zoom_end=1.06),
+
+    # 5. 乾杯 + 料理シーン (クリーン)
+    Scene("photo", 3.0,
+          image="DSC02075修.jpg", crop_x_pct=0.5,
+          zoom_start=1.06, zoom_end=1.00),
+
+    # 6. 写真の上にテキスト「さまざまな、ご会食に。」
+    Scene("photo_text", 3.0, text="さまざまな、ご会食に。",
           image=" 日月 Nichigetsu02.JPG", crop_x_pct=0.5,
           zoom_start=1.06, zoom_end=1.00,
           bg_darken=0.22, bg_blur=5),
 
-    # 5. 写真の上にブランド「心斎橋 禅園 / Shinsaibashi Zenen」 (茶器背景)
-    Scene("photo_brand", 3.5, text="心斎橋　禅園", sub="Shinsaibashi Zenen",
+    # 7. 写真の上にブランド「心斎橋 禅園 / Shinsaibashi Zenen」 (茶器背景)
+    Scene("photo_brand", 3.0, text="心斎橋　禅園", sub="Shinsaibashi Zenen",
           image="梨山 rizan01.JPG", crop_x_pct=0.45,
           zoom_start=1.04, zoom_end=1.00,
           bg_darken=0.24, bg_blur=5),
 
-    # 6. 写真の上に店舗情報カード
-    Scene("photo_info", 7.0,
+    # 8. 写真の上に店舗情報カード
+    Scene("photo_info", 6.5,
           image=" 日月 Nichigetsu03 .JPG", crop_x_pct=0.5,
           zoom_start=1.00, zoom_end=1.03,
           bg_darken=0.38, bg_blur=12),
 
-    # 7. 写真の上に CTA「詳しくは、プロフィールへ。」
-    Scene("photo_cta", 3.0, text="詳しくは、プロフィールへ。",
+    # 9. 写真の上に CTA「詳しくは、プロフィールへ。」
+    Scene("photo_cta", 2.5, text="詳しくは、プロフィールへ。",
           image="梨山 rizan03.JPG", crop_x_pct=0.5,
           zoom_start=1.04, zoom_end=1.00,
           bg_darken=0.24, bg_blur=5),
@@ -251,7 +261,11 @@ def build_scene_ass(scene: Scene, font_name: str) -> str:
 
     # ---------- kind 別のイベント生成 ----------
 
-    if scene.kind == "photo_tag":
+    if scene.kind == "photo":
+        # クリーン: テキスト無し、写真だけでシーンを見せる
+        pass
+
+    elif scene.kind == "photo_tag":
         # エディトリアル風: 明朝テキストを左下に添える
         # テロップを大きくしたのに合わせて下部暗幕も 160→220 に拡大
         events.append(rect("&HA8&", 0, HEIGHT - 220, WIDTH, 220))
